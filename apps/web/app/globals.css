@@ -1,50 +1,26 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@import "tailwindcss";
+.App {
+  font-family: sans-serif;
+  text-align: center;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.leaflet-container {
+  height: 600px;
+  width: 100%;
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
+.leaflet-div-icon {
+  background: transparent;
+  border: none;
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-}
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+.cph {
+  @apply cursor-pointer;
 }
-
-a {
-  color: inherit;
-  text-decoration: none;
+@theme {
+  --color-avocado-100: oklch(0.99 0 0);
 }
+@plugin "daisyui";
 
-.imgDark {
-  display: none;
-}
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
-
-  .imgLight {
-    display: none;
-  }
-  .imgDark {
-    display: unset;
-  }
-}
