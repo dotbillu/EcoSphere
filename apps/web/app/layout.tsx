@@ -8,12 +8,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <div className="relative z-[999]">
-          <Navbar />
+        <div className="bg-black">
+          <div className="relative z-[999]">
+            <Navbar />
+          </div>
+          <div className="h-screen w-screen">{children}</div>
         </div>
-        <div className="h-screen w-screen">{children}</div>
       </body>
     </html>
   );
 }
-

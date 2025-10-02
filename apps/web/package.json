@@ -18,6 +18,7 @@
     "lucide-react": "^0.544.0",
     "mapillary-js": "^4.1.2",
     "next": "^15.5.0",
+    "next-auth": "^4.24.11",
     "postcss": "^8.5.6",
     "react": "19.0.0-rc.1",
     "react-dom": "19.0.0-rc.1",
