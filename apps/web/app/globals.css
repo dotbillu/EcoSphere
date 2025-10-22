@@ -23,4 +23,25 @@
 }
 @plugin "daisyui";
 
+/* styles/globals.css */
 
+/* This is a more aggressive selector. It finds the main map container
+  and then targets all button elements within it.
+*/
+.gm-style button {
+  border-radius: 8px !important; /* The !important is crucial */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important; /* Add a stronger shadow */
+  border: none !important; /* Remove the default border */
+}
+
+/* Specifically target the map/satellite toggle */
+.gm-style .gm-style-mtc {
+  border-radius: 8px !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important;
+}
+
+/* Target the Pegman icon */
+.gm-svpc {
+   border-radius: 8px !important;
+   box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important;
+}
