@@ -23,11 +23,7 @@
 }
 @plugin "daisyui";
 
-/* styles/globals.css */
 
-/* This is a more aggressive selector. It finds the main map container
-  and then targets all button elements within it.
-*/
 .gm-style button {
   border-radius: 8px !important; /* The !important is crucial */
   box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important; /* Add a stronger shadow */

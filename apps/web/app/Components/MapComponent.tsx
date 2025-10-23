@@ -1,60 +1,78 @@
 // Components/MapComponent.tsx
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAtom } from "jotai";
 import { GoogleMap, useJsApiLoader, MarkerF } from "@react-google-maps/api";
 import { locationAtom } from "../store";
 
-// CORRECTED: Set controls to 'true' to make them visible
 const mapOptions = {
   streetViewControl: true,
   mapTypeControl: true,
   fullscreenControl: true,
-  zoomControl: true, // This one is usually on by default
+  zoomControl: true,
 };
 
 export default function MapComponent() {
   const [location, setLocation] = useAtom(locationAtom);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-  if (!apiKey) {
-    throw new Error("Google Maps API key is missing...");
-  }
+  if (!apiKey) throw new Error("Google Maps API key is missing...");
 
   const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
+    id: "google-map-script",
     googleMapsApiKey: apiKey,
   });
 
-  // The rest of your component code is perfect, no changes needed below this line
-  // ... (useEffect, useMemo, etc.)
-
   useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.error("Error getting geolocation:", error);
+    if (!("geolocation" in navigator)) {
+      console.log("Geolocation not supported in this browser.");
+      setLocation({ lat: 28.4089, lng: 77.3178 });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (error) => {
+        // Log meaningful error info
+        console.error(
+          "Geolocation error:",
+          `code=${error.code}`,
+          `message=${error.message}`
+        );
+
+        if (error.code === 1) {
+          // PERMISSION_DENIED
+          setPermissionDenied(true);
+        } else {
+          // fallback to default location
           setLocation({ lat: 28.4089, lng: 77.3178 });
         }
-      );
-    } else {
-      console.log("Geolocation not supported.");
-      setLocation({ lat: 28.4089, lng: 77.3178 });
-    }
+      }
+    );
   }, [setLocation]);
 
   const center = useMemo(() => {
-    return (location.lat && location.lng)
+    return location.lat && location.lng
       ? { lat: location.lat, lng: location.lng }
       : { lat: 28.4089, lng: 77.3178 };
   }, [location]);
+
+  if (permissionDenied) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-white">
+        <p className="text-lg font-semibold text-gray-700">
+          Allow location to continue
+        </p>
+      </div>
+    );
+  }
 
   if (!isLoaded || !location.lat) {
     return (
@@ -66,12 +84,13 @@ export default function MapComponent() {
 
   return (
     <GoogleMap
-      mapContainerStyle={{ width: '100%', height: '100%' }}
+      mapContainerStyle={{ width: "100%", height: "100%" }}
       center={center}
       zoom={15}
-      options={mapOptions} // This now enables the buttons
+      options={mapOptions}
     >
       <MarkerF position={center} />
     </GoogleMap>
   );
 }
+

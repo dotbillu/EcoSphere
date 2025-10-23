@@ -1,53 +1,93 @@
+// Components/MapComponent.tsx
 "use client";
-import { Activity, LogOut, SunMoon, User } from "lucide-react";
-import { useState } from "react";
 
-export default function ProfilePage() {
-  const [showProfile, setShowProfile] = useState(false);
+import { useEffect, useMemo, useState } from "react";
+import { useAtom } from "jotai";
+import { GoogleMap, useJsApiLoader, MarkerF } from "@react-google-maps/api";
+import { locationAtom } from "../store";
 
-  return (
-    <div>
-      <User
-        className="fixed right-2 m-3 mt-5 z-50 border border-amber-50 cursor-pointer rounded-2xl bg-white"
-        color="black"
-        strokeWidth={0.7}
-        size={25}
-        onClick={() => setShowProfile(!showProfile)}
-      />
-      {showProfile && <SideBarContent />}
-    </div>
-  );
-}
+const mapOptions = {
+  streetViewControl: true,
+  mapTypeControl: true,
+  fullscreenControl: true,
+  zoomControl: true,
+};
 
-function SideBarContent() {
-  const menuItems = [
-    { label: "Auth Status", icon: User },
-    { label: "Logout", icon: LogOut },
-    { label: "Change Theme", icon: Activity },
-    { label: "My Activities", icon: SunMoon },
-  ];
+export default function MapComponent() {
+  const [location, setLocation] = useAtom(locationAtom);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-  function HandleOnClick(lab:string){
-alert(lab)
-  }
-  return (
-    <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-max h-max bg-white text-black shadow-lg rounded-2xl p-2">
-      <div className="flex flex-col">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-            onClick={()=>HandleOnClick(item.label)}
-              key={item.label}
-              className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-2xl cursor-pointer border-transparent"
-            >
-              <Icon size={20} />
-              {item.label}
-            
-            </button>
+  if (!apiKey) throw new Error("Google Maps API key is missing...");
+
+  const { isLoaded } = useJsApiLoader({
+    id: "google-map-script",
+    googleMapsApiKey: apiKey,
+  });
+
+  useEffect(() => {
+    if (!("geolocation" in navigator)) {
+      setLocation({ lat: 28.4089, lng: 77.3178 });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (error) => {
+        if (error.code === 1) {
+          // PERMISSION_DENIED — silently handle it
+          setPermissionDenied(true);
+        } else {
+          // Log only other errors
+          console.error(
+            "Geolocation error:",
+            `code=${error.code}`,
+            `message=${error.message}`
           );
-        })}
+          setLocation({ lat: 28.4089, lng: 77.3178 });
+        }
+      }
+    );
+  }, [setLocation]);
+
+  const center = useMemo(() => {
+    return location.lat && location.lng
+      ? { lat: location.lat, lng: location.lng }
+      : { lat: 28.4089, lng: 77.3178 };
+  }, [location]);
+
+  if (permissionDenied) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-white">
+        <p className="text-lg font-semibold text-gray-700">
+          Allow location to continue
+        </p>
       </div>
-    </div>
+    );
+  }
+
+  if (!isLoaded || !location.lat) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <span className="loading loading-spinner loading-lg" />
+      </div>
+    );
+  }
+
+  return (
+    <GoogleMap
+      mapContainerStyle={{ width: "100%", height: "100%" }}
+      center={center}
+      zoom={15}
+      options={mapOptions}
+    >
+      <MarkerF position={center} />
+    </GoogleMap>
   );
 }
+

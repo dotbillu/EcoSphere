@@ -15,7 +15,7 @@ export default function SearchBar() {
   }, [isExpanded]);
 
   return (
-    <div className="absolute top-4 right-4">
+    <div className="absolute top-3 right-4 mr-10 ">
       <div
         onClick={() => setIsExpanded(true)}
         className={`flex items-center border rounded-full px-2 py-2 transition-all duration-300 overflow-hidden
