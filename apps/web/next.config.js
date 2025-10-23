@@ -1,8 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["react-leaflet", "leaflet"],
   images: {
-    domains: ["lh3.googleusercontent.com"], 
+    domains: ["lh3.googleusercontent.com", "localhost"],
   },
 };
 

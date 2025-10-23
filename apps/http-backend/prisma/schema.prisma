@@ -10,22 +10,23 @@ generator client {
 model User {
   id        Int     @id @default(autoincrement())
   name      String
+  username  String  @unique
   email     String  @unique
   image     String?
   createdAt DateTime @default(now())
 
-  posts     Post[]
+  posts     Post[]  @relation("UserPosts", fields: [], references: [])
 }
 
 model Post {
   id        Int      @id @default(autoincrement())
-  userId    Int
+  username  String
   content   String
   imageUrls String[]
   createdAt DateTime @default(now())
   location  String?
   likes     Int      @default(0)
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation("UserPosts", fields: [username], references: [username])
 }
 
