@@ -32,9 +32,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [status, path]);
 
 
-  if (status === "loading") {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
-  }
+ if (status === "loading") {
+  return (
+    <div className="fixed inset-0 bg-black flex items-center justify-center z-50">
+      <span className="loading loading-dots loading-xl text-white"></span>
+    </div>
+  );
+}
+
 
  
   if (status === "unauthenticated" && path === "/login") {

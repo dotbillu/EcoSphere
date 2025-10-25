@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Image, Smile, MapPin, X } from "lucide-react";
+import { Image, MapPin, X } from "lucide-react";
 import { useAtom } from "jotai";
 import { locationAtom, userAtom } from "../../store";
-import NextImage from "next/image"; // You already have this import
+import NextImage from "next/image";
 import dynamic from "next/dynamic";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -20,8 +20,8 @@ export default function CreatePost({
   const [previews, setPreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [includeLocation, setIncludeLocation] = useState(false);
+  const [locationName, setLocationName] = useState("");
   const [error, setError] = useState("");
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const [user] = useAtom(userAtom);
   const [coords, setCoords] = useAtom(locationAtom);
@@ -34,12 +34,10 @@ export default function CreatePost({
       </p>
     );
 
-  // ... (handleImageChange function is unchanged) ...
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    const totalFiles = images.length + files.length;
-    if (totalFiles > 5) {
+    if (images.length + files.length > 5) {
       setError("You can upload max 5 images.");
       return;
     }
@@ -48,13 +46,11 @@ export default function CreatePost({
     setError("");
   };
 
-  // ... (removeImage function is unchanged) ...
   const removeImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
     setPreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ... (requestLocation function is unchanged) ...
   const requestLocation = async () => {
     if (!navigator.geolocation) return alert("Geolocation not supported");
     navigator.geolocation.getCurrentPosition(
@@ -63,22 +59,34 @@ export default function CreatePost({
     );
   };
 
-  // ... (getCityFromCoords function is unchanged) ...
   const getCityFromCoords = async (lat: number, lng: number) => {
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
       );
       const data = await res.json();
-      return (
-        data.address?.city || data.address?.town || data.address?.village || ""
-      );
+      return data.address?.city || data.address?.town || data.address?.village || "";
     } catch {
       return "";
     }
   };
 
-  // ... (handlePost function is unchanged) ...
+  const handleLocationToggle = async () => {
+    const toggle = !includeLocation;
+    setIncludeLocation(toggle);
+
+    if (toggle && (!coords.lat || !coords.lng)) {
+      await requestLocation();
+    }
+
+    if (toggle && coords.lat && coords.lng) {
+      const city = await getCityFromCoords(coords.lat, coords.lng);
+      setLocationName(city);
+    } else {
+      setLocationName("");
+    }
+  };
+
   const handlePost = async () => {
     if (!content.trim() && images.length === 0) {
       setError("Write something or add at least one image!");
@@ -86,26 +94,26 @@ export default function CreatePost({
     }
     setLoading(true);
     setError("");
-    let locationName = "";
-    if (includeLocation && coords.lat && coords.lng) {
-      locationName = await getCityFromCoords(coords.lat, coords.lng);
-    }
+
     const formData = new FormData();
     formData.append("username", user.username);
     formData.append("name", user.name);
     formData.append("content", content);
-    if (locationName) formData.append("location", locationName);
+    if (includeLocation && locationName) formData.append("location", locationName);
     images.forEach((img) => formData.append("images", img));
+
     try {
       const res = await fetch("http://localhost:4000/uploadPosts", {
         method: "POST",
         body: formData,
       });
       if (!res.ok) throw new Error(await res.text());
+
       setContent("");
       setImages([]);
       setPreviews([]);
       setIncludeLocation(false);
+      setLocationName("");
       if (onPostSuccess) onPostSuccess();
       else window.location.reload();
     } catch {
@@ -115,7 +123,6 @@ export default function CreatePost({
     }
   };
 
-  // ... (handleTextChange function is unchanged) ...
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (e.target.value.length > 5000) return;
     setContent(e.target.value);
@@ -138,7 +145,6 @@ export default function CreatePost({
       {error && <p className="text-red-500 text-sm">{error}</p>}
 
       <div className="flex gap-3">
-        {/* --- MODIFIED AVATAR SECTION --- */}
         <div className="flex-shrink-0">
           {user.image ? (
             <NextImage
@@ -154,14 +160,11 @@ export default function CreatePost({
             />
           ) : (
             <div className="bg-neutral-focus text-neutral-content rounded-full w-12 h-12 flex items-center justify-center">
-              {/* Using user.name for the initial is better */}
               <span>{user.name[0].toUpperCase()}</span>
             </div>
           )}
         </div>
-        {/* --- END OF MODIFICATION --- */}
 
-        {/* input + actions */}
         <div className="flex-1 relative">
           <textarea
             ref={textareaRef}
@@ -172,19 +175,13 @@ export default function CreatePost({
             rows={1}
           />
 
-          {/* Image previews */}
           <div className="flex flex-wrap gap-3 mt-3">
             {previews.map((src, index) => (
               <div
                 key={index}
                 className="relative w-32 h-32 rounded-2xl overflow-hidden border border-gray-700"
               >
-                <NextImage
-                  src={src}
-                  alt={`preview-${index}`}
-                  fill
-                  className="object-cover"
-                />
+                <NextImage src={src} alt={`preview-${index}`} fill className="object-cover" />
                 <button
                   onClick={() => removeImage(index)}
                   className="absolute top-1 right-1 bg-black/60 rounded-full p-1 hover:bg-black/80 transition"
@@ -195,7 +192,6 @@ export default function CreatePost({
             ))}
           </div>
 
-          {/* Actions */}
           <div className="flex justify-between items-center mt-3">
             <span className="text-gray-400 text-sm">{content.length}/5000</span>
             <div className="flex gap-4 items-center relative text-blue-500">
@@ -211,12 +207,7 @@ export default function CreatePost({
               </label>
 
               <button
-                onClick={async () => {
-                  const toggle = !includeLocation;
-                  setIncludeLocation(toggle);
-                  if (toggle && (!coords.lat || !coords.lng))
-                    await requestLocation();
-                }}
+                onClick={handleLocationToggle}
                 className={`flex items-center gap-1 text-sm ${
                   includeLocation
                     ? "text-green-500 hover:text-green-400"
@@ -224,8 +215,8 @@ export default function CreatePost({
                 }`}
               >
                 <MapPin className="w-5 h-5" />
-                {includeLocation && coords.lat && coords.lng && (
-                  <span className="text-xs">Sharing City</span>
+                {includeLocation && locationName && (
+                  <span className="text-xs">{locationName}</span>
                 )}
               </button>
 
@@ -243,3 +234,4 @@ export default function CreatePost({
     </motion.div>
   );
 }
+

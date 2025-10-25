@@ -360,15 +360,16 @@ export default function Feedbox() {
         })}
       </AnimatePresence>
 
-      {loading && (
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-white text-center p-4"
-        >
-          Loading...
-        </motion.p>
-      )}
+    {loading && (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    className="bg-black flex items-center justify-center m-10"
+  >
+<span className="loading loading-spinner loading-sm"></span>
+        </motion.div>
+)}
+
       {!hasMore && (
         <p className="text-gray-500 text-center p-4">
           You've reached the end

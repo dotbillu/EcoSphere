@@ -15,9 +15,9 @@ const Map = dynamic(() => import("../Components/MapComponent"), {
 export default function MapPage() {
   return (
     <>
-      <div className="relative z-999"> 
-        <SearchBar />
-      </div>
+      {/* <div className="relative z-999">  */}
+      {/*   <SearchBar /> */}
+      {/* </div> */}
       <div style={{ height: "100vh", width: "100vw" }}>
         <Map />
       </div>
