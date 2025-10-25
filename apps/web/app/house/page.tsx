@@ -6,7 +6,7 @@ return(<>
     <div className="z-[999] relative ">
       <ProfilePage/>
 </div>
-<div>
+<div className="w-full bg-black">
       <Feedbox/>
     </div>
   </>)

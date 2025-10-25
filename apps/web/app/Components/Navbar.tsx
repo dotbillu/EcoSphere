@@ -1,5 +1,5 @@
 "use client";
-import { Activity, House, Map, Network, Search, Settings } from "lucide-react";
+import { Activity, BotMessageSquare, House, Map, Network, Search, Settings, User } from "lucide-react";
 import { CurrentPageAtom, PageName } from "../store";
 import { useAtom } from "jotai";
 import { useRouter } from "next/navigation";
@@ -14,9 +14,9 @@ export default function Navbar() {
   const icons = [
     { name: "House", Icon: House },
     { name: "Map", Icon: Map },
-    { name: "Search", Icon: Search },
+    { name: "CHATAI", Icon: BotMessageSquare },
     { name: "Network", Icon: Network },
-    { name: "Activity", Icon: Activity },
+    { name: "profile", Icon: User },
   ] as const;
   function HandleOnClick(pagename: PageName) {
     setCurrentPage(pagename);

@@ -7,10 +7,10 @@ import { GoogleMap, useJsApiLoader, MarkerF } from "@react-google-maps/api";
 import { locationAtom } from "../store";
 
 const mapOptions = {
-  streetViewControl: true,
+  streetViewControl: false,
   mapTypeControl: true,
-  fullscreenControl: true,
-  zoomControl: true,
+  fullscreenControl: false,
+  zoomControl: false,
 };
 
 export default function MapComponent() {
