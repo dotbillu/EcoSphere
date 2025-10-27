@@ -59,21 +59,27 @@ model MapRoom {
 }
 
 model Gig {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String?
-  latitude    Float
-  longitude   Float
-  date        DateTime?
-  createdAt   DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  latitude    Float
+  longitude   Float
 
-  createdBy User @relation("GigCreator", fields: [creatorId], references: [id])
-  creatorId Int
+  date        DateTime?
+   
+  reward      String?
+   
+  expiresAt   DateTime? 
 
-  room   MapRoom? @relation("RoomGigs", fields: [roomId], references: [id])
-  roomId Int?
+  createdAt   DateTime @default(now())
 
-  type String?
+  createdBy User @relation("GigCreator", fields: [creatorId], references: [id])
+  creatorId Int
 
-  imageUrls String[] @default([])
+  room   MapRoom? @relation("RoomGigs", fields: [roomId], references: [id])
+  roomId Int?
+
+  type String?
+
+  imageUrls String[] @default([])
 }

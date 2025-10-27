@@ -1,4 +1,3 @@
-// Components/MapComponent.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -9,132 +8,18 @@ import {
   MarkerF,
   InfoWindowF,
 } from "@react-google-maps/api";
-import { locationAtom, userAtom, MapRoom, Gig, User } from "../store"; // Import new types and userAtom
-import CreateRoomModal from "./CreateRoomModal"; // Import new modal
-import CreateGigModal from "./CreateGigModal"; // Import new modal
+import { locationAtom, userAtom } from "../../store";
 import { Home, Star, User as UserIcon, Trash2, Navigation } from "lucide-react";
-// --- MODIFICATION ---
-// Import the getImageUrl helper
-import { getImageUrl } from "../lib/utils";
-import Image from "next/image"; // Import Next's Image component
+import { getImageUrl } from "../../lib/utils";
+import Image from "next/image";
 
-// Map options
-const mapOptions: google.maps.MapOptions = {
-  streetViewControl: false,
-  mapTypeControl: false, // Hide Satellite/Map toggle
-  fullscreenControl: false,
-  zoomControl: false,
-  styles: [
-    // Add a simple dark-mode style for the map
-    { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-    { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-    { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-    {
-      featureType: "administrative.locality",
-      elementType: "labels.text.fill",
-      stylers: [{ color: "#d59563" }],
-    },
-    // --- MODIFICATION: Hide POIs, businesses, transit labels, etc. ---
-    {
-      featureType: "poi",
-      elementType: "labels",
-      stylers: [{ visibility: "off" }],
-    },
-    {
-      featureType: "poi.business",
-      stylers: [{ visibility: "off" }],
-    },
-    {
-      featureType: "transit",
-      elementType: "labels",
-      stylers: [{ visibility: "off" }],
-    },
-    {
-      featureType: "administrative.land_parcel",
-      stylers: [{ visibility: "off" }],
-    },
-    {
-      featureType: "administrative.neighborhood",
-      stylers: [{ visibility: "off" }],
-    },
-    // --- End of POI styles ---
-    {
-      featureType: "poi.park",
-      elementType: "geometry",
-      stylers: [{ color: "#263c3f" }],
-    },
-    {
-      featureType: "poi.park",
-      elementType: "labels.text.fill",
-      stylers: [{ color: "#6b9a76" }],
-    },
-    {
-      featureType: "road",
-      elementType: "geometry",
-      stylers: [{ color: "#38414e" }],
-    },
-    {
-      featureType: "road",
-      elementType: "geometry.stroke",
-      stylers: [{ color: "#212a37" }],
-    },
-    {
-      featureType: "road",
-      elementType: "labels.text.fill",
-      stylers: [{ color: "#9ca5b3" }],
-    },
-    {
-      featureType: "road.highway",
-      elementType: "geometry",
-      stylers: [{ color: "#746855" }],
-    },
-    {
-      featureType: "road.highway",
-      elementType: "geometry.stroke",
-      stylers: [{ color: "#1f2835" }],
-    },
-    {
-      featureType: "road.highway",
-      elementType: "labels.text.fill",
-      stylers: [{ color: "#f3d19c" }],
-    },
-    {
-      featureType: "transit",
-      elementType: "geometry",
-      stylers: [{ color: "#2f3948" }],
-    },
-    {
-      featureType: "transit.station",
-      elementType: "labels.text.fill",
-      stylers: [{ color: "#d59563" }],
-    },
-    {
-      featureType: "water",
-      elementType: "geometry",
-      stylers: [{ color: "#17263c" }],
-    },
-    {
-      featureType: "water",
-      elementType: "labels.text.fill",
-      stylers: [{ color: "#515c6d" }],
-    },
-    {
-      featureType: "water",
-      elementType: "labels.text.stroke",
-      stylers: [{ color: "#17263c" }],
-    },
-  ],
-};
-
-// --- MODIFICATION ---
-// We need to add `creatorId` to our local types for the delete button to work.
-// Make sure your backend `GET /map/rooms` and `GET /map/gigs` routes `select` this!
-interface MapElement extends MapRoom {
-  creatorId?: number;
-}
-interface GigElement extends Gig {
-  creatorId?: number;
-}
+// Import new components and helpers
+import { mapOptions } from "./map/mapOptions"; 
+import { MapElement, GigElement } from "./map/MapTypes";
+import GigDetailSidebar from "./map/GigDetailSidebar";
+import Lightbox from "./map/Lightbox";
+import CreateRoomModal from "./map/CreateRoomModal";
+import CreateGigModal from "./map/CreateGigModal";
 
 export default function MapComponent() {
   const [user] = useAtom(userAtom);
@@ -142,16 +27,17 @@ export default function MapComponent() {
   const [permissionDenied, setPermissionDenied] = useState(false);
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-  // --- MODIFICATION: Use new types ---
   const [rooms, setRooms] = useState<MapElement[]>([]);
   const [gigs, setGigs] = useState<GigElement[]>([]);
   const [selectedElement, setSelectedElement] = useState<
     MapElement | GigElement | null
   >(null);
-  // ---
   const [isRoomModalOpen, setRoomModalOpen] = useState(false);
   const [isGigModalOpen, setGigModalOpen] = useState(false);
   const [joinStatus, setJoinStatus] = useState<Record<number, string>>({});
+  const [detailedGig, setDetailedGig] = useState<GigElement | null>(null);
+  const [isLightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   if (!apiKey) throw new Error("Google Maps API key is missing...");
 
@@ -171,7 +57,6 @@ export default function MapComponent() {
           ),
         scaledSize: new google.maps.Size(32, 32),
       },
-      // This is the fallback gig icon (yellow star)
       gig: {
         url:
           "data:image/svg+xml;charset=UTF-8," +
@@ -186,13 +71,12 @@ export default function MapComponent() {
           encodeURIComponent(
             '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="#3B82F6" stroke="#FFFFFF" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></svg>'
           ),
-        // --- MODIFICATION: Made user icon smaller ---
         scaledSize: new google.maps.Size(32, 32),
       },
     };
   }, [isLoaded]);
 
-  // --- GEOLOCATION EFFECT (unchanged) ---
+  // --- GEOLOCATION EFFECT ---
   useEffect(() => {
     if (!("geolocation" in navigator)) {
       console.log("Geolocation not supported");
@@ -215,12 +99,10 @@ export default function MapComponent() {
     );
   }, [setLocation]);
 
-  // --- DATA FETCHING EFFECT (unchanged) ---
+  // --- DATA FETCHING EFFECT ---
   useEffect(() => {
     if (!isLoaded) return;
-    // --- MODIFICATION: Add a comment reminding to update backend
-    // TODO: Make sure your backend routes GET /map/rooms and GET /map/gigs
-    // `select` the `creatorId` for the delete button to work!
+
     const fetchRooms = async () => {
       try {
         const res = await fetch("http://localhost:4000/map/rooms");
@@ -243,7 +125,7 @@ export default function MapComponent() {
     fetchGigs();
   }, [isLoaded]);
 
-  // --- HANDLER TO JOIN A ROOM (unchanged) ---
+  // --- HANDLERS ---
   const handleJoinRoom = async (roomId: number) => {
     if (!user) {
       alert("You must be logged in to join a room.");
@@ -266,51 +148,56 @@ export default function MapComponent() {
     }
   };
 
-  // --- MODIFICATION: Add Navigation Handler ---
-  const handleNavigate = () => {
-    if (!selectedElement) return;
-    const { latitude, longitude } = selectedElement;
+  const handleNavigate = (element: MapElement | GigElement | null) => {
+    if (!element) return;
+    const { latitude, longitude } = element;
     const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
     window.open(url, "_blank");
   };
 
-  // --- MODIFICATION: Add Delete Handler ---
-  const handleDelete = async () => {
-    if (!selectedElement || !user) return;
-    if (user.id !== selectedElement.creatorId) {
+  const handleDelete = async (element: MapElement | GigElement | null) => {
+    if (!element || !user) return;
+    if (user.id !== element.creatorId) {
       alert("You can only delete items you created.");
       return;
     }
 
-    const isGig = "title" in selectedElement;
+    const isGig = "title" in element;
     const type = isGig ? "gig" : "room";
-    const id = selectedElement.id;
+    const id = element.id;
 
     if (!window.confirm(`Are you sure you want to delete this ${type}?`)) {
       return;
     }
 
-    // TODO: You need to create these DELETE routes in your backend
-    // e.g., DELETE /map/gig/:id and DELETE /map/room/:id
     try {
       const res = await fetch(`http://localhost:4000/map/${type}/${id}`, {
         method: "DELETE",
-        // You might need to send auth headers here in the future
       });
 
       if (!res.ok) throw new Error(`Failed to delete ${type}`);
 
-      // Remove from state on success
       if (isGig) {
         setGigs((prev) => prev.filter((g) => g.id !== id));
+        setDetailedGig(null); // Close sidebar on delete
       } else {
         setRooms((prev) => prev.filter((r) => r.id !== id));
       }
-      setSelectedElement(null);
+      setSelectedElement(null); // Close infowindow
     } catch (err) {
       console.error(err);
-      alert(`Error deleting ${type}. (Have you created the DELETE route?)`);
+      alert(`Error deleting ${type}.`);
     }
+  };
+
+  const handleShowDetails = (gig: GigElement) => {
+    setDetailedGig(gig);
+    setSelectedElement(null); // Close the info window
+  };
+
+  const handleOpenLightbox = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
   };
 
   const center = useMemo(() => {
@@ -319,6 +206,7 @@ export default function MapComponent() {
       : { lat: 28.4089, lng: 77.3178 }; // Default center
   }, [location]);
 
+  // --- RENDER STATES ---
   if (permissionDenied) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-zinc-900 text-white">
@@ -337,7 +225,25 @@ export default function MapComponent() {
 
   return (
     <div className="relative h-full w-full">
-      {/* --- FLOATING ACTION BUTTONS (unchanged) --- */}
+      {detailedGig && (
+        <GigDetailSidebar
+          gig={detailedGig}
+          currentUserId={user?.id}
+          onClose={() => setDetailedGig(null)}
+          onNavigate={() => handleNavigate(detailedGig)}
+          onDelete={() => handleDelete(detailedGig)}
+          onShowLightbox={handleOpenLightbox}
+        />
+      )}
+
+      {isLightboxOpen && detailedGig && (
+        <Lightbox
+          images={detailedGig.imageUrls}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
+
       <div className="absolute top-4 right-4 z-10 space-x-2">
         <button
           onClick={() => setRoomModalOpen(true)}
@@ -358,35 +264,34 @@ export default function MapComponent() {
         center={center}
         zoom={15}
         options={mapOptions}
-        // --- MODIFICATION: Close InfoWindow when map is clicked ---
-        onClick={() => setSelectedElement(null)}
+        onClick={() => {
+          setSelectedElement(null);
+          setDetailedGig(null);
+        }}
       >
-        {/* --- 1. USER'S LOCATION MARKER --- */}
         <MarkerF
           position={center}
           icon={icons.user}
-          // --- MODIFICATION: Lower zIndex so it's *below* other markers ---
           zIndex={1}
         />
 
-        {/* --- 2. ROOM MARKERS --- */}
         {rooms.map((room) => (
           <MarkerF
             key={`room-${room.id}`}
             position={{ lat: room.latitude, lng: room.longitude }}
             icon={icons.room}
-            onClick={() => setSelectedElement(room)}
-            // --- MODIFICATION: Set zIndex to be clickable ---
+            onClick={() => {
+              setSelectedElement(room);
+              setDetailedGig(null);
+            }}
             zIndex={5}
           />
         ))}
 
-        {/* --- 3. GIG MARKERS --- */}
         {gigs.map((gig) => (
           <MarkerF
             key={`gig-${gig.id}`}
             position={{ lat: gig.latitude, lng: gig.longitude }}
-            // --- MODIFICATION: Use uploaded image as icon, or fallback to star ---
             icon={
               gig.imageUrls && gig.imageUrls[0]
                 ? {
@@ -396,13 +301,14 @@ export default function MapComponent() {
                   }
                 : icons.gig
             }
-            onClick={() => setSelectedElement(gig)}
-            // --- MODIFICATION: Set zIndex to be clickable ---
+            onClick={() => {
+              setSelectedElement(gig);
+              setDetailedGig(null);
+            }}
             zIndex={5}
           />
         ))}
 
-        {/* --- 4. INFO WINDOW (shows for selected element) --- */}
         {selectedElement && (
           <InfoWindowF
             position={{
@@ -411,91 +317,91 @@ export default function MapComponent() {
             }}
             onCloseClick={() => setSelectedElement(null)}
           >
-            {/* --- MODIFICATION: Updated InfoWindow Content --- */}
-            <div className="p-1 bg-white text-black max-w-xs w-64">
-              {"title" in selectedElement ? (
-                // --- GIG INFO WINDOW ---
-                <div>
-                  {selectedElement.imageUrls &&
-                    selectedElement.imageUrls[0] && (
-                      <div className="relative w-full h-32 rounded-t-lg overflow-hidden">
-                        <Image
-                          src={getImageUrl(selectedElement.imageUrls[0])}
-                          alt={selectedElement.title}
-                          layout="fill"
-                          objectFit="cover"
-                        />
-                      </div>
-                    )}
-                  <div className="p-2">
-                    <h3 className="font-bold text-base text-amber-600 truncate">
-                      <Star size={14} className="inline-block mr-1" />
+            {"title" in selectedElement ? (
+              <div className="p-1 bg-white text-black w-64">
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0 w-16 h-16 relative rounded overflow-hidden">
+                    <Image
+                      src={getImageUrl(
+                        selectedElement.imageUrls &&
+                          selectedElement.imageUrls[0]
+                          ? selectedElement.imageUrls[0]
+                          : "default_placeholder.png"
+                      )}
+                      alt={selectedElement.title}
+                      layout="fill"
+                      objectFit="cover"
+                    />
+                  </div>
+                  <div className="flex-grow min-w-0">
+                    <h3 className="font-bold text-sm text-amber-600 truncate">
                       {selectedElement.title}
                     </h3>
-                    <p className="text-sm text-zinc-700 mt-1 line-clamp-2">
+                    <p className="text-xs text-zinc-600 truncate">
+                      {selectedElement.reward || "No reward specified"}
+                    </p>
+                    <p className="text-xs text-zinc-700 mt-1 line-clamp-2">
                       {selectedElement.description}
                     </p>
-                    {selectedElement.date && (
-                      <p className="text-xs text-zinc-500 mt-2">
-                        {new Date(selectedElement.date).toLocaleString()}
-                      </p>
-                    )}
                   </div>
                 </div>
-              ) : (
-                // --- ROOM INFO WINDOW ---
-                <div>
-                  {selectedElement.imageUrl && (
-                    <div className="relative w-full h-32 rounded-t-lg overflow-hidden">
-                      <Image
-                        src={getImageUrl(selectedElement.imageUrl)}
-                        alt={selectedElement.name}
-                        layout="fill"
-                        objectFit="cover"
-                      />
-                    </div>
-                  )}
-                  <div className="p-2">
-                    <h3 className="font-bold text-base text-emerald-600 truncate">
-                      <Home size={14} className="inline-block mr-1" />
-                      {selectedElement.name}
-                    </h3>
-                    <p className="text-sm text-zinc-700 mt-1 line-clamp-2">
-                      {selectedElement.description}
-                    </p>
-                    <button
-                      onClick={() => handleJoinRoom(selectedElement.id)}
-                      disabled={!!joinStatus[selectedElement.id]}
-                      className="mt-3 w-full px-3 py-1.5 bg-emerald-500 text-white text-sm font-bold rounded hover:bg-emerald-600 disabled:bg-zinc-400"
-                    >
-                      {joinStatus[selectedElement.id] || "Join Room"}
-                    </button>
-                  </div>
-                </div>
-              )}
-              {/* --- MODIFICATION: Add Navigate and Delete Buttons --- */}
-              <div className="flex gap-1 p-2 border-t border-zinc-200">
                 <button
-                  onClick={handleNavigate}
-                  className="flex-1 px-3 py-1.5 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600 flex items-center justify-center gap-1.5"
+                  onClick={() => handleShowDetails(selectedElement as GigElement)}
+                  className="mt-2 w-full px-3 py-1.5 bg-amber-500 text-white text-sm font-bold rounded hover:bg-amber-600"
                 >
-                  <Navigation size={14} /> Navigate
+                  Get Details
                 </button>
-                {user && user.id === selectedElement.creatorId && (
-                  <button
-                    onClick={handleDelete}
-                    className="px-3 py-1.5 bg-red-500 text-white text-sm font-bold rounded hover:bg-red-600"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
               </div>
-            </div>
+            ) : (
+              <div>
+                {selectedElement.imageUrl && (
+                  <div className="relative w-full h-32 rounded-t-lg overflow-hidden">
+                    <Image
+                      src={getImageUrl(selectedElement.imageUrl)}
+                      alt={selectedElement.name}
+                      layout="fill"
+                      objectFit="cover"
+                    />
+                  </div>
+                )}
+                <div className="p-2">
+                  <h3 className="font-bold text-base text-emerald-600 truncate">
+                    <Home size={14} className="inline-block mr-1" />
+                    {selectedElement.name}
+                  </h3>
+                  <p className="text-sm text-zinc-700 mt-1 line-clamp-2">
+                    {selectedElement.description}
+                  </p>
+                  <button
+                    onClick={() => handleJoinRoom(selectedElement.id)}
+                    disabled={!!joinStatus[selectedElement.id]}
+                    className="mt-3 w-full px-3 py-1.5 bg-emerald-500 text-white text-sm font-bold rounded hover:bg-emerald-600 disabled:bg-zinc-400"
+                  >
+                    {joinStatus[selectedElement.id] || "Join Room"}
+                  </button>
+                </div>
+                <div className="flex gap-1 p-2 border-t border-zinc-200">
+                  <button
+                    onClick={() => handleNavigate(selectedElement)}
+                    className="flex-1 px-3 py-1.5 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600 flex items-center justify-center gap-1.5"
+                  >
+                    <Navigation size={14} /> Navigate
+                  </button>
+                  {user && user.id === selectedElement.creatorId && (
+                    <button
+                      onClick={() => handleDelete(selectedElement)}
+                      className="px-3 py-1.5 bg-red-500 text-white text-sm font-bold rounded hover:bg-red-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </InfoWindowF>
         )}
       </GoogleMap>
 
-      {/* --- 5. MODALS (unchanged) --- */}
       {isRoomModalOpen && (
         <CreateRoomModal
           location={location}

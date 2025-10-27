@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import SearchBar from "../Components/SearchBar";
 
-const Map = dynamic(() => import("../Components/MapComponent"), {
+const Map = dynamic(() => import("../Components/MapComponents/MapComponent"), {
   ssr: false,
   loading: () => (
     <div className="flex h-screen w-screen items-center justify-center">
@@ -16,7 +16,7 @@ export default function MapPage() {
   return (
     <>
       {/* <div className="relative z-999">  */}
-      {/*   <SearchBar /> */}
+        <SearchBar />
       {/* </div> */}
       <div style={{ height: "100vh", width: "100vw" }}>
         <Map />
