@@ -51,7 +51,7 @@ Users can upload gigs to earn money, create rooms on the map, and interact throu
 
 ```bash
 # Clone and setup
-command -v cowsay >/dev/null 2>&1 && cowsay "dont clone it yet its incomplete" || echo "dont clone it yet its incomplete"
+echo "dont clone it yet its incomplete"
 ```
 
 Open [localhost:3000](http://localhost:3000)
