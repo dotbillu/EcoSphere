@@ -1,31 +1,15 @@
 @import "tailwindcss";
-.App {
-  font-family: sans-serif;
-  text-align: center;
-}
 
-.leaflet-container {
-  height: 600px;
-  width: 100%;
-}
-
-.leaflet-div-icon {
-  background: transparent;
-  border: none;
-}
-
-
-.cph {
-  @apply cursor-pointer;
-}
-@theme {
-  --color-avocado-100: oklch(0.99 0 0);
-}
 @plugin "daisyui";
 
-
-.gm-style button {
-  border-radius: 8px !important; /* The !important is crucial */
+@layer base {
+  body {
+    background-color: #000;   
+    color: theme("colors.gray.200");  
+  }
 }
 
+.gm-style button {
+  border-radius: 8px !important;
+}
 

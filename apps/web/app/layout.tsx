@@ -49,11 +49,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
  
   if (session) {
     return (
-      <div className="bg-black">
+      <div className="bg-black ">
         <div className="relative z-[999]">
           <Navbar />
         </div>
-        <div className="h-screen w-screen">{children}</div>
+        <div className="h-screen w-screen bg-black">{children}</div>
       </div>
     );
   }

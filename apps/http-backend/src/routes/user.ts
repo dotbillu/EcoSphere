@@ -6,6 +6,7 @@ import type { Router as ExpressRouter } from "express";
 const router: ExpressRouter = Router();
 
 // --- Create or find user ---
+// (No changes needed here)
 router.post("/", async (req, res) => {
   const { name, email, image } = req.body;
 
@@ -45,8 +46,24 @@ router.get("/profile/:username", async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { username },
       include: {
+      
         posts: {
           orderBy: { createdAt: "desc" },
+          include: {
+           
+            likes: {
+              select: {
+                userId: true,
+              },
+            },
+           
+            _count: {
+              select: {
+                likes: true,
+                comments: true,
+              },
+            },
+          },
         },
         rooms: {
           select: {
@@ -83,6 +100,24 @@ router.get("/profile/:username", async (req, res) => {
             type: true,
           },
         },
+        // --- ADDED FOR NEW SCHEMA ---
+        followers: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            image: true,
+          },
+        },
+        following: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            image: true,
+          },
+        },
+        // --- END OF ADDED ---
       },
     });
 
@@ -94,7 +129,6 @@ router.get("/profile/:username", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
 
 // --- Update user profile ---
 router.patch(
@@ -108,7 +142,6 @@ router.patch(
     const { username } = req.params;
     const { name } = req.body;
 
-    
     const files = req.files as {
       [fieldname: string]: Express.Multer.File[];
     };
@@ -116,12 +149,13 @@ router.patch(
     const posterImageFile = files?.["posterImage"]?.[0];
 
     try {
-      const existingUser = await prisma.user.findUnique({ where: { username } });
+      const existingUser = await prisma.user.findUnique({
+        where: { username },
+      });
       if (!existingUser) {
         return res.status(404).json({ message: "User not found" });
       }
 
-    
       const updateData: {
         name?: string;
         image?: string;
@@ -136,19 +170,16 @@ router.patch(
         updateData.image = imageFile.filename;
       }
 
-  
       if (posterImageFile) {
         updateData.posterImage = posterImageFile.filename;
       }
 
-    
       if (Object.keys(updateData).length > 0) {
         await prisma.user.update({
           where: { username },
           data: updateData,
         });
 
-     
         if (updateData.name) {
           await prisma.post.updateMany({
             where: { username },
@@ -157,8 +188,6 @@ router.patch(
         }
       }
 
-     
-      
       const updatedFullProfile = await prisma.user.findUnique({
         where: { username },
         include: {
@@ -200,6 +229,24 @@ router.patch(
               type: true,
             },
           },
+          // --- ADDED FOR NEW SCHEMA ---
+          followers: {
+            select: {
+              id: true,
+              username: true,
+              name: true,
+              image: true,
+            },
+          },
+          following: {
+            select: {
+              id: true,
+              username: true,
+              name: true,
+              image: true,
+            },
+          },
+          // --- END OF ADDED ---
         },
       });
 
@@ -209,8 +256,7 @@ router.patch(
       console.error(`Error updating profile for ${username}:`, err);
       res.status(500).json({ message: "Internal server error" });
     }
-  }
+  },
 );
 
 export default router;
-

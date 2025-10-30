@@ -5,32 +5,37 @@ import {
   userAtom,
   User,
   UserProfile,
+ 
 } from "../store";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { Calendar } from "lucide-react";
-import EditProfileModal from "../Components/ProfileComponents/EditProfileModal"; 
+import { Calendar, Loader2 } from "lucide-react"; 
+import EditProfileModal from "../Components/ProfileComponents/EditProfileModal";
+import { useRouter } from "next/navigation"; 
 
-import ProfilePost from "../Components/ProfileComponents/ProfilePost"; 
-import ProfileGig from "../Components/ProfileComponents/ProfileGig"; 
-import ProfileRoom from "../Components/ProfileComponents/ProfileRoom"; 
+import ProfilePost from "../Components/ProfileComponents/ProfilePost";
+import ProfileGig from "../Components/ProfileComponents/ProfileGig";
+import ProfileRoom from "../Components/ProfileComponents/ProfileRoom";
 
-// --- Import the shared helper ---
+
 import { getImageUrl } from "../lib/utils";
 
 export default function Profile() {
-  const [user, setUser] = useAtom(userAtom);
+  
+  const [loggedInUser, setLoggedInUser] = useAtom(userAtom);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState("Posts");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const router = useRouter();
 
   const tabs = ["Posts", "Gigs", "Rooms"];
 
   useEffect(() => {
-    if (!user) return;
+   
+    if (!loggedInUser) return;
 
-    fetch(`http://localhost:4000/user/profile/${user.username}`)
+    fetch(`http://localhost:4000/user/profile/${loggedInUser.username}`)
       .then(async (res) => {
         if (!res.ok) {
           console.error("Failed to fetch profile data");
@@ -40,31 +45,84 @@ export default function Profile() {
         setProfile(json);
       })
       .catch((err) => console.error(err));
-  }, [user]);
+  }, [loggedInUser]); 
 
   const handleProfileUpdate = (updatedProfileData: UserProfile) => {
-
     setProfile(updatedProfileData);
-
-
-    const { posts, gigs, rooms, mapRooms, ...updatedUser } = updatedProfileData;
-    setUser(updatedUser as User);
-
+   
+    const { posts, gigs, rooms, mapRooms, followers, following, ...updatedUser } = updatedProfileData;
+    setLoggedInUser(updatedUser as User); // Update the Jotai atom
     setIsEditModalOpen(false);
+  };
+
+ 
+  const handleLikeToggle = async (postId: number) => {
+    if (!loggedInUser?.id || !profile) return;
+    const currentUserId = loggedInUser.id;
+
+   
+    setProfile((prevProfile) => {
+      if (!prevProfile) return null;
+      return {
+        ...prevProfile,
+        posts: prevProfile.posts.map((post) => {
+          if (post.id === postId) {
+            const isLiked = post.likes.some(
+              (like) => like.userId === currentUserId,
+            );
+            if (isLiked) {
+              // UNLIKE
+              return {
+                ...post,
+                likes: post.likes.filter(
+                  (like) => like.userId !== currentUserId,
+                ),
+                _count: { ...post._count, likes: post._count.likes - 1 },
+              };
+            } else {
+           
+              return {
+                ...post,
+                likes: [...post.likes, { userId: currentUserId }], 
+                _count: { ...post._count, likes: post._count.likes + 1 },
+              };
+            }
+          }
+          return post;
+        }),
+      };
+    });
+
+  
+    try {
+      await fetch(`http://localhost:4000/posts/${postId}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUserId }),
+      });
+    } catch (err) {
+      console.error("Failed to toggle like:", err);
+
+    }
+  };
+
+
+  const handleNavigateToPost = (postId: number) => {
+    router.push(`/post/${postId}`);
   };
 
   if (!profile)
     return (
-       <div className="fixed inset-0 bg-black flex items-center justify-center z-50">
-      <span className="loading loading-dots loading-xl text-white"></span>
-    </div>
+      <div className="fixed inset-0 bg-black flex items-center justify-center z-50">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
     );
 
- 
+
   const allRooms = [
     ...profile.mapRooms,
     ...profile.rooms.filter(
-      (room) => !profile.mapRooms.some((mr) => mr.id === room.id)
+      (room) => !profile.mapRooms.some((mr) => mr.id === room.id),
     ),
   ];
 
@@ -123,6 +181,19 @@ export default function Profile() {
                 year: "numeric",
               })}
             </div>
+            
+            {/* Follower Count */}
+            <div className="flex gap-4 mt-3 text-sm">
+                <p>
+                    <span className="font-bold text-white">{profile.following.length}</span>
+                    <span className="text-zinc-500"> Following</span>
+                </p>
+                <p>
+                    <span className="font-bold text-white">{profile.followers.length}</span>
+                    <span className="text-zinc-500"> Followers</span>
+                </p>
+            </div>
+
           </div>
         </div>
 
@@ -159,6 +230,10 @@ export default function Profile() {
                     key={post.id}
                     post={post}
                     userImageUrl={profile.image}
+                    // Pass down the new props
+                    currentUserId={loggedInUser?.id}
+                    onLikeToggle={handleLikeToggle}
+                    onNavigate={handleNavigateToPost}
                   />
                 ))
               ) : (

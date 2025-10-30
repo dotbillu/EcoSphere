@@ -14,7 +14,7 @@ app.use("/uploads", express.static("uploads"));
 
 // Routes
 app.use("/user", userRoutes);
-app.use("/", postRoutes); // handles /posts and /uploadPosts
+app.use("/", postRoutes);
 app.use('/map',mapRoutes);
 
 app.listen(PORT, () => {

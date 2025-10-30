@@ -8,12 +8,19 @@ import NextImage from "next/image";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 
-const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
+// Assume the Post type is defined elsewhere or use 'any'
+// You likely have this type in your Feedbox component
+interface Post {
+  id: number;
+  // ... other post fields
+}
 
+// 1. UPDATED PROPS:
+// Renamed 'onPostSuccess' to 'onPostCreated' and expect it to take the new post
 export default function CreatePost({
-  onPostSuccess,
+  onPostCreated,
 }: {
-  onPostSuccess?: () => void;
+  onPostCreated: (newPost: Post) => void;
 }) {
   const [content, setContent] = useState("");
   const [images, setImages] = useState<File[]>([]);
@@ -34,6 +41,7 @@ export default function CreatePost({
       </p>
     );
 
+  // --- (All other functions like handleImageChange, handleLocationToggle are unchanged) ---
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
@@ -86,7 +94,21 @@ export default function CreatePost({
       setLocationName("");
     }
   };
+  
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (e.target.value.length > 5000) return;
+    setContent(e.target.value);
+    setError("");
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 250)}px`;
+      el.style.overflowY = el.scrollHeight > 250 ? "auto" : "hidden";
+    }
+  };
 
+
+  // 2. UPDATED handlePost FUNCTION:
   const handlePost = async () => {
     if (!content.trim() && images.length === 0) {
       setError("Write something or add at least one image!");
@@ -109,13 +131,22 @@ export default function CreatePost({
       });
       if (!res.ok) throw new Error(await res.text());
 
+      // Get the new post from the response
+      const newPost: Post = await res.json();
+
+      // Reset the form
       setContent("");
       setImages([]);
       setPreviews([]);
       setIncludeLocation(false);
       setLocationName("");
-      if (onPostSuccess) onPostSuccess();
-      else window.location.reload();
+      
+      // 3. CALL THE PARENT'S FUNCTION with the new post
+      if (onPostCreated) {
+        onPostCreated(newPost);
+      }
+      // No more window.location.reload()
+
     } catch {
       setError("Upload failed. Please try again.");
     } finally {
@@ -123,18 +154,7 @@ export default function CreatePost({
     }
   };
 
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    if (e.target.value.length > 5000) return;
-    setContent(e.target.value);
-    setError("");
-    const el = textareaRef.current;
-    if (el) {
-      el.style.height = "auto";
-      el.style.height = `${Math.min(el.scrollHeight, 250)}px`;
-      el.style.overflowY = el.scrollHeight > 250 ? "auto" : "hidden";
-    }
-  };
-
+  // --- (JSX is unchanged) ---
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -143,7 +163,6 @@ export default function CreatePost({
       className="p-4 border-b border-gray-700 space-y-3"
     >
       {error && <p className="text-red-500 text-sm">{error}</p>}
-
       <div className="flex gap-3">
         <div className="flex-shrink-0">
           {user.image ? (
@@ -164,7 +183,6 @@ export default function CreatePost({
             </div>
           )}
         </div>
-
         <div className="flex-1 relative">
           <textarea
             ref={textareaRef}
@@ -174,7 +192,6 @@ export default function CreatePost({
             className="w-full bg-transparent border-none resize-none focus:outline-none text-white placeholder-gray-500 text-xl overflow-hidden"
             rows={1}
           />
-
           <div className="flex flex-wrap gap-3 mt-3">
             {previews.map((src, index) => (
               <div
@@ -191,7 +208,6 @@ export default function CreatePost({
               </div>
             ))}
           </div>
-
           <div className="flex justify-between items-center mt-3">
             <span className="text-gray-400 text-sm">{content.length}/5000</span>
             <div className="flex gap-4 items-center relative text-blue-500">
@@ -205,7 +221,6 @@ export default function CreatePost({
                   onChange={handleImageChange}
                 />
               </label>
-
               <button
                 onClick={handleLocationToggle}
                 className={`flex items-center gap-1 text-sm ${
@@ -219,7 +234,6 @@ export default function CreatePost({
                   <span className="text-xs">{locationName}</span>
                 )}
               </button>
-
               <button
                 onClick={handlePost}
                 disabled={loading || (!content.trim() && images.length === 0)}
@@ -234,4 +248,3 @@ export default function CreatePost({
     </motion.div>
   );
 }
-

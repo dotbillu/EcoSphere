@@ -12,14 +12,24 @@ model User {
   name        String
   username    String    @unique
   email       String    @unique
-  image       String? //profile 
-  posterImage String? //poster 
+  image       String? // profile
+  posterImage String? // poster
   createdAt   DateTime  @default(now())
-  posts       Post[]    @relation("UserPosts")
-  rooms       MapRoom[] @relation("UserRooms")
-  mapRooms    MapRoom[] @relation("MapRoomCreator")
-  gigs        Gig[]     @relation("GigCreator")
+
+  posts    Post[]    @relation("UserPosts")
+  rooms    MapRoom[] @relation("UserRooms")
+  mapRooms MapRoom[] @relation("MapRoomCreator")
+  gigs     Gig[]     @relation("GigCreator")
+
+
+  followers User[]    @relation("UserFollows")
+  following User[]    @relation("UserFollows")
+
+ 
+  likes     Like[]    @relation("UserLikes")
+  comments  Comment[] @relation("UserComments")
 }
+
 
 model Post {
   id        Int      @id @default(autoincrement())
@@ -29,13 +39,40 @@ model Post {
   imageUrls String[]
   location  String?
   createdAt DateTime @default(now())
-  user      User     @relation("UserPosts", fields: [username], references: [username])
-  
 
-  // Added the relation name "RoomPosts" to match the 'posts' field in MapRoom
-  room      MapRoom? @relation("RoomPosts", fields: [roomId], references: [id])
-  roomId    Int?
+  user   User     @relation("UserPosts", fields: [username], references: [username])
+  room   MapRoom? @relation("RoomPosts", fields: [roomId], references: [id])
+  roomId Int?
+
+  likes    Like[]    @relation("PostLikes")
+  comments Comment[] @relation("PostComments")
 }
+
+model Like {
+  id     Int  @id @default(autoincrement())
+  post   Post @relation("PostLikes", fields: [postId], references: [id])
+  postId Int
+
+  user   User @relation("UserLikes", fields: [userId], references: [id])
+  userId Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+}
+
+model Comment {
+  id      Int    @id @default(autoincrement())
+  content String
+  post    Post   @relation("PostComments", fields: [postId], references: [id])
+  postId  Int
+
+  user    User   @relation("UserComments", fields: [userId], references: [id])
+  userId  Int
+
+  createdAt DateTime @default(now())
+}
+
 
 model MapRoom {
   id          Int      @id @default(autoincrement())
@@ -51,35 +88,33 @@ model MapRoom {
   members User[] @relation("UserRooms")
 
 
-  posts     Post[]   @relation("RoomPosts")
-  type      String?
+  posts    Post[]  @relation("RoomPosts")
+  type     String?
 
   imageUrl String?
-  gigs     Gig[]  @relation("RoomGigs")
+  gigs     Gig[]   @relation("RoomGigs")
 }
 
 model Gig {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String?
-  latitude    Float
-  longitude   Float
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  latitude    Float
+  longitude   Float
 
-  date        DateTime?
-   
-  reward      String?
-   
-  expiresAt   DateTime? 
+  date      DateTime?
+  reward    String?
+  expiresAt DateTime?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  createdBy User @relation("GigCreator", fields: [creatorId], references: [id])
-  creatorId Int
+  createdBy User @relation("GigCreator", fields: [creatorId], references: [id])
+  creatorId Int
 
-  room   MapRoom? @relation("RoomGigs", fields: [roomId], references: [id])
-  roomId Int?
+  room   MapRoom? @relation("RoomGigs", fields: [roomId], references: [id])
+  roomId Int?
 
-  type String?
+  type String?
 
-  imageUrls String[] @default([])
+  imageUrls String[] @default([])
 }

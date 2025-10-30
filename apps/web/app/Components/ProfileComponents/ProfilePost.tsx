@@ -3,25 +3,39 @@
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { MapPin, X, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  MapPin,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Heart,
+  MessageCircle,
+} from "lucide-react";
 import { Post } from "../../store";
-import { getImageUrl } from "../../lib/utils"; // Import the helper
+import { getImageUrl } from "../../lib/utils";
 
-// -----------------------------------------------------------------
-// ProfilePost Component
-// -----------------------------------------------------------------
 export default function ProfilePost({
   post,
   userImageUrl,
+  currentUserId,
+  onLikeToggle,
+  onNavigate,
 }: {
   post: Post;
   userImageUrl?: string | null;
+  currentUserId?: number;
+  onLikeToggle: (postId: number) => void;
+  onNavigate: (postId: number) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [needsTruncation, setNeedsTruncation] = useState(false);
   const contentRef = useRef<HTMLParagraphElement>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalImageIndex, setModalImageIndex] = useState(0);
+
+  const isLikedByCurrentUser = post.likes.some(
+    (like) => like.userId === currentUserId,
+  );
 
   useEffect(() => {
     if (contentRef.current) {
@@ -31,36 +45,43 @@ export default function ProfilePost({
     }
   }, [post.content, isExpanded]);
 
-  const openModal = (index: number) => {
+  const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
+
+  const openModal = (e: React.MouseEvent, index: number) => {
+    e.stopPropagation();
     setModalImageIndex(index);
     setIsModalOpen(true);
   };
-  const closeModal = () => setIsModalOpen(false);
-  
+
+  const closeModal = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setIsModalOpen(false);
+  };
+
   const showNextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setModalImageIndex((prev) =>
-      prev < post.imageUrls.length - 1 ? prev + 1 : 0
-    );
+    setModalImageIndex((prev) => (prev + 1) % post.imageUrls.length);
   };
+
   const showPrevImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setModalImageIndex((prev) =>
-      prev > 0 ? prev - 1 : post.imageUrls.length - 1
+    setModalImageIndex(
+      (prev) => (prev - 1 + post.imageUrls.length) % post.imageUrls.length,
     );
   };
 
   const renderImageGrid = () => {
-    // ... (This function is identical to your provided code)
     const count = post.imageUrls.length;
     if (count === 0) return null;
+
     const gridBase =
       "relative w-full max-w-xl h-80 rounded-2xl overflow-hidden mt-3 border border-zinc-700";
+
     if (count === 1) {
       return (
         <div
           className={`${gridBase} cursor-pointer`}
-          onClick={() => openModal(0)}
+          onClick={(e) => openModal(e, 0)}
         >
           <Image
             src={getImageUrl(post.imageUrls[0])}
@@ -71,6 +92,7 @@ export default function ProfilePost({
         </div>
       );
     }
+
     if (count === 2) {
       return (
         <div className={`${gridBase} grid grid-cols-2 gap-0.5`}>
@@ -78,7 +100,7 @@ export default function ProfilePost({
             <div
               key={index}
               className="relative h-full cursor-pointer"
-              onClick={() => openModal(index)}
+              onClick={(e) => openModal(e, index)}
             >
               <Image
                 src={getImageUrl(url)}
@@ -91,52 +113,14 @@ export default function ProfilePost({
         </div>
       );
     }
-    if (count === 3) {
-      return (
-        <div className={`${gridBase} grid grid-cols-2 grid-rows-2 gap-0.5`}>
-          <div
-            className="relative row-span-2 cursor-pointer"
-            onClick={() => openModal(0)}
-          >
-            <Image
-              src={getImageUrl(post.imageUrls[0])}
-              alt="Post image 1"
-              fill
-              style={{ objectFit: "cover" }}
-            />
-          </div>
-          <div
-            className="relative col-start-2 cursor-pointer"
-            onClick={() => openModal(1)}
-          >
-            <Image
-              src={getImageUrl(post.imageUrls[1])}
-              alt="Post image 2"
-              fill
-              style={{ objectFit: "cover" }}
-            />
-          </div>
-          <div
-            className="relative col-start-2 row-start-2 cursor-pointer"
-            onClick={() => openModal(2)}
-          >
-            <Image
-              src={getImageUrl(post.imageUrls[2])}
-              alt="Post image 3"
-              fill
-              style={{ objectFit: "cover" }}
-            />
-          </div>
-        </div>
-      );
-    }
+
     return (
       <div className={`${gridBase} grid grid-cols-2 grid-rows-2 gap-0.5`}>
         {post.imageUrls.slice(0, 4).map((url, index) => (
           <div
             key={index}
             className="relative h-full cursor-pointer"
-            onClick={() => openModal(index)}
+            onClick={(e) => openModal(e, index)}
           >
             <Image
               src={getImageUrl(url)}
@@ -162,12 +146,15 @@ export default function ProfilePost({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 15 }}
       transition={{ duration: 0.2 }}
-      className="p-4 border-b border-zinc-700 transition-colors hover:bg-white/5"
+      onClick={() => onNavigate(post.id)}
+      className="p-4 border-b border-zinc-700 transition-colors hover:bg-white/5 cursor-pointer"
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
+      <div
+        className="flex items-center justify-between mb-2"
+        onClick={stopPropagation}
+      >
         <div className="flex items-center gap-3">
-          {/* Avatar */}
           {userImageUrl ? (
             <Image
               src={getImageUrl(userImageUrl)}
@@ -182,7 +169,6 @@ export default function ProfilePost({
             </div>
           )}
 
-          {/* Name and Date */}
           <div className="flex items-center gap-2">
             <p className="text-white font-bold">{post.name}</p>
             <p className="text-zinc-400 text-sm">
@@ -211,57 +197,88 @@ export default function ProfilePost({
 
       {(needsTruncation || isExpanded) && (
         <button
-          onClick={() => setIsExpanded((prev) => !prev)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded((prev) => !prev);
+          }}
           className="text-blue-500 hover:underline mt-2 text-sm font-medium"
         >
           {isExpanded ? "Show less" : "Show more"}
         </button>
       )}
 
-      {/* Image Grid */}
       {renderImageGrid()}
 
-      {/* Image Modal */}
+      {/* Like/Comment Bar */}
+      <div className="flex items-center gap-6 mt-4 text-zinc-500">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onLikeToggle(post.id);
+          }}
+          disabled={!currentUserId}
+          className={`flex items-center gap-1.5 transition-colors duration-200 group ${
+            isLikedByCurrentUser ? "text-red-500" : "hover:text-red-500"
+          } ${!currentUserId ? "opacity-50" : ""}`}
+        >
+          <Heart
+            size={18}
+            fill={isLikedByCurrentUser ? "currentColor" : "none"}
+            className="group-hover:scale-110 transition-transform  cursor-pointer"
+          />
+          <span className="text-sm">{post._count.likes}</span>
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onNavigate(post.id);
+          }}
+          className="flex items-center gap-1.5 hover:text-blue-500 transition-colors duration-200 group"
+        >
+          <MessageCircle
+            size={18}
+            className="group-hover:scale-110 cursor-pointer transition-transform"
+          />
+          <span className="text-sm">{post._count.comments}</span>
+        </button>
+      </div>
+
+      {/* Modal */}
       {isModalOpen && (
         <div
           className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
           onClick={closeModal}
         >
           <button
-            className="absolute top-4 right-4 text-white z-[60] p-2"
+            className="absolute top-4 right-4 text-white"
             onClick={closeModal}
           >
-            <X size={32} />
+            <X size={24} />
           </button>
-          {post.imageUrls.length > 1 && (
-            <button
-              className="absolute left-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
-              onClick={showPrevImage}
-            >
-              <ChevronLeft size={32} />
-            </button>
-          )}
-          <div
-            className="relative w-[90vw] h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            className="absolute left-4 text-white"
+            onClick={showPrevImage}
           >
+            <ChevronLeft size={32} />
+          </button>
+          <div className="relative w-[90vw] h-[80vh]">
             <Image
               src={getImageUrl(post.imageUrls[modalImageIndex])}
-              alt="Post image expanded"
+              alt="Modal image"
               fill
               style={{ objectFit: "contain" }}
             />
           </div>
-          {post.imageUrls.length > 1 && (
-            <button
-              className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
-              onClick={showNextImage}
-            >
-              <ChevronRight size={32} />
-            </button>
-          )}
+          <button
+            className="absolute right-4 text-white"
+            onClick={showNextImage}
+          >
+            <ChevronRight size={32} />
+          </button>
         </div>
       )}
     </motion.div>
   );
 }
+
