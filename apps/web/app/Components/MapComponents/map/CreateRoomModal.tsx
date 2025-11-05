@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAtom } from "jotai";
 import { userAtom } from "../../../store";
 import { MapElement } from "./MapTypes";
+import { Loader2 } from "lucide-react";
 
 type CreateRoomModalProps = {
   location: { lat: number; lng: number };
@@ -22,16 +23,12 @@ export default function CreateRoomModal({
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const allFilled = name.trim() && description.trim() && type.trim();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) {
-      setError("You must be logged in to create a room.");
-      return;
-    }
-    if (!name) {
-      setError("Room name is required.");
-      return;
-    }
+    if (!user) return setError("You must be logged in to create a room.");
+    if (!allFilled) return setError("Please fill in all fields.");
 
     setIsLoading(true);
     setError("");
@@ -43,9 +40,7 @@ export default function CreateRoomModal({
     formData.append("longitude", location.lng.toString());
     formData.append("creatorId", user.id.toString());
     formData.append("type", type);
-    if (image) {
-      formData.append("image", image);
-    }
+    if (image) formData.append("image", image);
 
     try {
       const res = await fetch("http://localhost:4000/map/room", {
@@ -68,74 +63,102 @@ export default function CreateRoomModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
-      <div className="bg-zinc-800 text-white p-6 rounded-lg shadow-xl w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-4">Create a New Room</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="room-name" className="block text-sm font-medium text-zinc-300">Room Name</label>
-            <input
-              id="room-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-neutral-900 border border-neutral-800 text-gray-100 p-5 rounded-lg w-full max-w-md shadow-lg">
+        <h2 className="text-lg font-semibold mb-4">Create a New Room</h2>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {/* Name + Type in one row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col">
+              <label className="text-sm text-gray-300 mb-1">Room Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="bg-neutral-800 border border-neutral-700 text-gray-100 px-3 py-2 rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-500"
+              />
+            </div>
+
+            <div className="flex flex-col">
+              <label className="text-sm text-gray-300 mb-1">Type</label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="bg-neutral-800 border border-neutral-700 text-gray-100 px-3 py-2 rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-500"
+              >
+                <option value="social">GIG RELATED</option>
+                <option value="fun">SOCIAL</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label htmlFor="room-desc" className="block text-sm font-medium text-zinc-300">Description</label>
+
+          {/* Description */}
+          <div className="flex flex-col">
+            <label className="text-sm text-gray-300 mb-1">Description</label>
             <textarea
-              id="room-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              rows={2}
+              className="bg-neutral-800 border border-neutral-700 text-gray-100 px-3 py-2 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-neutral-500"
             />
           </div>
-          <div>
-            <label htmlFor="room-type" className="block text-sm font-medium text-zinc-300">Type</label>
-            <select
-              id="room-type"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="SOCIAL">Social</option>
-              <option value="GAMING">Gaming</option>
-              <option value="STUDY">Study</option>
-              <option value="OTHER">Other</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor="room-image" className="block text-sm font-medium text-zinc-300">Cover Image (Optional)</label>
+
+          {/* Image */}
+          <div className="flex flex-col">
+            <label className="text-sm text-gray-300 mb-1">
+              Cover Image (optional)
+            </label>
             <input
-              id="room-image"
               type="file"
               accept="image/*"
-              onChange={(e) => setImage(e.target.files ? e.target.files[0] : null)}
-              className="w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700"
+              onChange={(e) =>
+                setImage(e.target.files ? e.target.files[0] : null)
+              }
+              className="text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-neutral-700 file:text-gray-200 hover:file:bg-neutral-600"
             />
           </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          <div className="flex justify-end gap-3 pt-4">
+
+          {error && <p className="text-red-400 text-xs">{error}</p>}
+
+          {/* Buttons */}
+          <div className="flex justify-end items-center gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="px-4 py-2 bg-zinc-600 rounded-md hover:bg-zinc-700 disabled:opacity-50"
+              className="px-4 py-2 text-sm bg-neutral-700 rounded-md hover:bg-neutral-600 transition disabled:opacity-50"
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-4 py-2 bg-emerald-500 rounded-md hover:bg-emerald-600 disabled:opacity-50"
-            >
-              {isLoading ? "Creating..." : "Create Room"}
-            </button>
+
+            <div className="relative group">
+              <button
+                type="submit"
+                disabled={isLoading || !allFilled}
+                className={`px-5 py-2 text-sm font-medium rounded-md transition flex items-center gap-2 ${
+                  allFilled
+                    ? "bg-neutral-100 text-neutral-900 hover:bg-white"
+                    : "bg-neutral-700 text-neutral-400 cursor-not-allowed"
+                }`}
+              >
+                {isLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  "Create"
+                )}
+              </button>
+
+              {!allFilled && (
+                <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-neutral-800 text-gray-200 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap shadow-md">
+                  Fill all fields first
+                </span>
+              )}
+            </div>
           </div>
         </form>
       </div>
     </div>
   );
 }
+
