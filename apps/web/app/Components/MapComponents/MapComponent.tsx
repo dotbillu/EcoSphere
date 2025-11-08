@@ -21,6 +21,22 @@ import Lightbox from "./map/Lightbox";
 import CreateRoomModal from "./map/CreateRoomModal";
 import CreateGigModal from "./map/CreateGigModal";
 
+// Helper function to sanitize any map element's coordinates
+const sanitizeCoords = (item: any) => {
+  if (!item) return null;
+  const lat = parseFloat(item.latitude);
+  const lng = parseFloat(item.longitude);
+
+  // Check if parsing failed
+  if (isNaN(lat) || isNaN(lng)) {
+    console.warn("Discarding item with invalid coordinates:", item);
+    return null; // This item will be filtered out
+  }
+
+  // Return the item with guaranteed-number coordinates
+  return { ...item, latitude: lat, longitude: lng };
+};
+
 export default function MapComponent() {
   const [user] = useAtom(userAtom);
   const [location, setLocation] = useAtom(locationAtom);
@@ -104,8 +120,13 @@ export default function MapComponent() {
           fetch("http://localhost:4000/map/rooms"),
           fetch("http://localhost:4000/map/gigs"),
         ]);
-        setRooms(await roomRes.json());
-        setGigs(await gigRes.json());
+
+        const roomsData = await roomRes.json();
+        const gigsData = await gigRes.json();
+
+        // Sanitize and filter both arrays
+        setRooms(roomsData.map(sanitizeCoords).filter(Boolean));
+        setGigs(gigsData.map(sanitizeCoords).filter(Boolean));
       } catch (e) {
         console.error("Failed fetching map data:", e);
       }
@@ -165,13 +186,17 @@ export default function MapComponent() {
     setLightboxOpen(true);
   };
 
-  const center = useMemo(
-    () =>
-      location.lat && location.lng
-        ? { lat: location.lat, lng: location.lng }
-        : { lat: 28.4089, lng: 77.3178 },
-    [location]
-  );
+  // --- (FIXED) ROBUST CENTER CALCULATION ---
+  const center = useMemo(() => {
+    const lat = parseFloat(location.lat as any);
+    const lng = parseFloat(location.lng as any);
+
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng };
+    }
+    // Fallback default
+    return { lat: 28.4089, lng: 77.3178 };
+  }, [location]);
 
   // --- RENDER STATES ---
   if (permissionDenied)
@@ -293,7 +318,11 @@ export default function MapComponent() {
           location={location}
           onClose={() => setRoomModalOpen(false)}
           onSuccess={(newRoom) => {
-            setRooms((p) => [...p, newRoom]);
+            // --- (FIXED) SANITIZE NEW ROOM ---
+            const sanitizedRoom = sanitizeCoords(newRoom);
+            if (sanitizedRoom) {
+              setRooms((p) => [...p, sanitizedRoom as MapElement]);
+            }
             setRoomModalOpen(false);
           }}
         />
@@ -303,7 +332,11 @@ export default function MapComponent() {
           location={location}
           onClose={() => setGigModalOpen(false)}
           onSuccess={(newGig) => {
-            setGigs((p) => [...p, newGig]);
+            // --- (FIXED) SANITIZE NEW GIG ---
+            const sanitizedGig = sanitizeCoords(newGig);
+            if (sanitizedGig) {
+              setGigs((p) => [...p, sanitizedGig as GigElement]);
+            }
             setGigModalOpen(false);
           }}
         />
@@ -311,4 +344,3 @@ export default function MapComponent() {
     </div>
   );
 }
-
