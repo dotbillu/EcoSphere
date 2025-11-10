@@ -6,20 +6,20 @@ import { useState, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { Calendar, Loader2 } from "lucide-react";
-import EditProfileModal from "../../Components/ProfileComponents/EditProfileModal";
+import EditProfileModal from "@components/ProfileComponents/EditProfileModal";
 import { useRouter, useParams } from "next/navigation";
 
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
-import ProfilePost from "../../Components/ProfileComponents/ProfilePost";
-import ProfileGig from "../../Components/ProfileComponents/ProfileGig";
-import ProfileRoom from "../../Components/ProfileComponents/ProfileRoom";
+import ProfilePost from "@components/ProfileComponents/ProfilePost";
+import ProfileGig from "@components/ProfileComponents/ProfileGig";
+import ProfileRoom from "@components/ProfileComponents/ProfileRoom";
 
-import { getImageUrl } from "../../lib/utils";
+import { getImageUrl } from "@lib/utils";
+import { API_BASE_URL } from "@/lib/constants";
 
-// API Helper Functions
 const fetchProfile = async (username: string): Promise<UserProfile> => {
-  const res = await fetch(`http://localhost:4000/user/profile/${username}`);
+  const res = await fetch(`${API_BASE_URL}/user/profile/${username}`);
   if (!res.ok) {
     throw new Error("Failed to fetch profile");
   }
@@ -33,7 +33,7 @@ const toggleFollow = async ({
   currentUserId: number;
   targetUsername: string;
 }) => {
-  const res = await fetch(`http://localhost:4000/user/follow`, {
+  const res = await fetch(`${API_BASE_URL}/user/follow`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ currentUserId, targetUsername }),
@@ -44,7 +44,6 @@ const toggleFollow = async ({
   return res.json();
 };
 
-// [NEW] API helper for toggling like
 const toggleLike = async ({
   userId,
   postId,
@@ -52,7 +51,7 @@ const toggleLike = async ({
   userId: number;
   postId: number;
 }) => {
-  const res = await fetch(`http://localhost:4000/posts/${postId}/like`, {
+  const res = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId }),
@@ -60,7 +59,6 @@ const toggleLike = async ({
   if (!res.ok) {
     throw new Error("Failed to toggle like");
   }
-  // Assuming the server returns the updated Profile data structure for re-syncing
   return res.json();
 };
 
@@ -75,9 +73,7 @@ export default function Profile() {
   const tabs = ["Posts", "Gigs", "Rooms"];
   const queryClient = useQueryClient();
 
-  // 1. Ref to hold the follow debounce timer
   const followDebounceTimer = useRef<NodeJS.Timeout | null>(null);
-  // [NEW] 2. Ref to hold the like debounce timer
   const likeDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   const {
@@ -97,7 +93,6 @@ export default function Profile() {
     return profile.followers.some((user) => user.id === loggedInUser.id);
   }, [profile?.followers, loggedInUser?.id]);
 
-  // Follow Mutation (Uses followDebounceTimer ref)
   const followMutation = useMutation({
     mutationFn: toggleFollow,
     onSettled: (data) => {
@@ -112,18 +107,15 @@ export default function Profile() {
     },
   });
 
-  // [NEW] Like Mutation (Uses likeDebounceTimer ref)
   const likeMutation = useMutation({
     mutationFn: toggleLike,
     onSettled: (data) => {
-      // Re-sync profile data if server returns it (best practice)
       if (data?.profile) {
         queryClient.setQueryData(
           ["profile", data.profile.username],
           data.profile,
         );
       } else {
-        // Fallback: Invalidate profile and general posts query for eventual consistency
         queryClient.invalidateQueries({ queryKey: ["profile", usernameFromUrl] });
       }
       queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -141,13 +133,11 @@ export default function Profile() {
     setIsEditModalOpen(false);
   };
 
-  // [UPDATED] Like Handler uses optimistic update and debounced mutation
   const handleLikeToggle = (postId: number) => {
     if (!loggedInUser?.id || !profile) return;
     const currentUserId = loggedInUser.id;
     const queryKey = ["profile", usernameFromUrl];
 
-    // 1. Optimistic Update (immediate UI change)
     queryClient.setQueryData<UserProfile>(queryKey, (previousProfile) => {
       if (!previousProfile) return;
 
@@ -162,7 +152,6 @@ export default function Profile() {
             const optimisticLikeEntry = { userId: currentUserId };
 
             if (isLiked) {
-              // Optimistically unlike
               return {
                 ...post,
                 likes: post.likes.filter(
@@ -171,7 +160,6 @@ export default function Profile() {
                 _count: { ...post._count, likes: post._count.likes - 1 },
               };
             } else {
-              // Optimistically like
               return {
                 ...post,
                 likes: [...post.likes, optimisticLikeEntry],
@@ -184,32 +172,27 @@ export default function Profile() {
       };
     });
 
-    // 2. Clear any pending network request
     if (likeDebounceTimer.current) {
       clearTimeout(likeDebounceTimer.current);
     }
 
-    // 3. Set a new timer to send the actual request via mutation
     likeDebounceTimer.current = setTimeout(() => {
       likeMutation.mutate({
         userId: currentUserId,
         postId: postId,
       });
-    }, 1000); // 1-second debounce delay
+    }, 1000);
   };
-
 
   const handleNavigateToPost = (postId: number) => {
     router.push(`/post/${postId}`);
   };
 
-  // Follow Handler (renamed ref for clarity)
   const handleToggleFollow = () => {
     if (!loggedInUser?.id || !profile?.username) return;
 
     const queryKey = ["profile", usernameFromUrl];
 
-    // 1. Optimistic Update (happens instantly on every click)
     queryClient.setQueryData<UserProfile>(queryKey, (oldProfile) => {
       if (!oldProfile) return;
 
@@ -235,18 +218,16 @@ export default function Profile() {
       return { ...oldProfile, followers: newFollowers };
     });
 
-    // 2. Clear any pending network request
-    if (followDebounceTimer.current) { // Using followDebounceTimer
+    if (followDebounceTimer.current) {
       clearTimeout(followDebounceTimer.current);
     }
 
-    // 3. Set a new timer to send the actual request
-    followDebounceTimer.current = setTimeout(() => { // Using followDebounceTimer
+    followDebounceTimer.current = setTimeout(() => {
       followMutation.mutate({
         currentUserId: loggedInUser.id,
         targetUsername: profile.username,
       });
-    }, 1000); // 1-second delay
+    }, 1000);
   };
 
   if (isLoading)
@@ -272,8 +253,8 @@ export default function Profile() {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-zinc-200">
-      <div className="border-x border-zinc-700 min-h-screen">
+    <div className="bg-black text-zinc-200">
+      <div className="border-x border-zinc-700">
         <div>
           <div className="relative h-48 bg-zinc-800 border-b border-zinc-700">
             {profile.posterImage && (
@@ -305,7 +286,6 @@ export default function Profile() {
                 </div>
               )}
 
-              {/* --- 5. (THE FIX) Button Logic --- */}
               {isOwner ? (
                 <button
                   onClick={() => setIsEditModalOpen(true)}
@@ -316,7 +296,6 @@ export default function Profile() {
               ) : (
                 <button
                   onClick={handleToggleFollow}
-                  // No 'disabled' prop!
                   className={`px-5 py-1.5 rounded-full text-sm font-bold transition-colors ${
                     isFollowing
                       ? "bg-transparent border border-zinc-600 text-white hover:bg-red-900/40 hover:border-red-500"

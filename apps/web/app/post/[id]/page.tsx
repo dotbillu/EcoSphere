@@ -18,7 +18,8 @@ import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 // Assuming getImageUrl is available and works as in the provided files
-import { getImageUrl } from "../../lib/utils";
+import { getImageUrl } from "@lib/utils";
+import { API_BASE_URL } from "@/lib/constants";
 
 // --- Type Definitions (from original) ---
 interface UserInfo {
@@ -196,7 +197,7 @@ export default function PostDetailPage() {
       setLoading(true);
       try {
         // NOTE: The previous fetch was missing getImageUrl, fixed here, but still uses hardcoded URL
-        const res = await fetch(`http://localhost:4000/posts/${postId}`);
+        const res = await fetch(`${API_BASE_URL}/posts/${postId}`);
         if (!res.ok) throw new Error("Post not found");
         const data: FullPost = await res.json();
         setPost(data);
@@ -275,7 +276,7 @@ export default function PostDetailPage() {
     // 3. Set a new timer to send the actual request
     likeDebounceTimer.current = setTimeout(async () => {
       try {
-        const res = await fetch(`http://localhost:4000/posts/${post.id}/like`, {
+        const res = await fetch(`${API_BASE_URL}/posts/${post.id}/like`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId: currentUserId }),
@@ -325,7 +326,7 @@ export default function PostDetailPage() {
 
     try {
       const res = await fetch(
-        `http://localhost:4000/posts/${post.id}/comment`,
+        `${API_BASE_URL}/posts/${post.id}/comment`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

@@ -1,12 +1,9 @@
 "use client";
 import {
-  Activity,
-  BotMessageSquare,
   House,
   Map,
+  BotMessageSquare,
   Network,
-  Search,
-  Settings,
   User,
 } from "lucide-react";
 import { CurrentPageAtom, PageName, userAtom, UserProfile } from "../store";
@@ -16,7 +13,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 const fetchProfile = async (username: string): Promise<UserProfile> => {
-  const res = await fetch(`http://127.0.0.1:4000/user/profile/${username}`); // <- faster than localhost in dev
+  const res = await fetch(`http://127.0.0.1:4000/user/profile/${username}`);
   if (!res.ok) throw new Error("Failed to fetch profile");
   return res.json();
 };
@@ -26,8 +23,8 @@ export default function Navbar() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
 
-  const stkwidth = 1;
-  const stksize = 14;
+  const stkwidth = 1.5;
+  const stksize = 20;
   const [currentPage, setCurrentPage] = useAtom(CurrentPageAtom);
   const [loggedInUser] = useAtom(userAtom);
 
@@ -39,39 +36,38 @@ export default function Navbar() {
     { name: "profile", Icon: User },
   ] as const;
 
-  // *** PERF PREFETCH ***
   useEffect(() => {
     if (!loggedInUser?.username) return;
-
-    // prefetch bundle
     router.prefetch(`/profile/${loggedInUser.username}`);
-
-    // prefetch data to react-query cache
     queryClient.prefetchQuery({
       queryKey: ["profile", loggedInUser.username],
       queryFn: () => fetchProfile(loggedInUser.username),
       staleTime: 60_000,
     });
-
-    // warm network connection itself
-    fetch(`http://127.0.0.1:4000/user/profile/${loggedInUser.username}`).catch(() => {});
+    fetch(`http://127.0.0.1:4000/user/profile/${loggedInUser.username}`).catch(
+      () => {}
+    );
   }, [loggedInUser, queryClient, router]);
 
-  // sync active icon
   useEffect(() => {
     const currentPath = (pathname.split("/")[1] || "house").toLowerCase();
     switch (currentPath) {
       case "house":
       case "":
-        setCurrentPage("House"); break;
+        setCurrentPage("House");
+        break;
       case "map":
-        setCurrentPage("Map"); break;
+        setCurrentPage("Map");
+        break;
       case "chatai":
-        setCurrentPage("CHATAI"); break;
+        setCurrentPage("CHATAI");
+        break;
       case "network":
-        setCurrentPage("Network"); break;
+        setCurrentPage("Network");
+        break;
       case "profile":
-        setCurrentPage("profile"); break;
+        setCurrentPage("profile");
+        break;
       default:
         setCurrentPage("House");
     }
@@ -94,14 +90,17 @@ export default function Navbar() {
   }
 
   return (
-    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 max-w-md px-4 z-top">
-      <div className="flex justify-between bg-white rounded-xl text-white p-[2px]">
+    <div className="w-full bg-black">
+      <div className="flex justify-around items-center max-w-lg mx-auto h-16 px-2">
         {icons.map(({ name, Icon }) => (
           <div
             key={name}
             onClick={() => HandleOnClick(name)}
-            className={`cursor-pointer rounded-xl p-2 px-3 mx-[2px] border-[1px] border-transparent active-border-white 
-              ${currentPage === name ? "bg-[#242426] text-white" : "hover:bg-zinc-100 text-black"}`}
+            className={`cursor-pointer rounded-xl p-3 transition-colors ${
+              currentPage === name
+                ? "bg-white text-black"
+                : "text-white hover:bg-zinc-800"
+            }`}
           >
             <Icon size={stksize} strokeWidth={stkwidth} />
           </div>
@@ -110,4 +109,3 @@ export default function Navbar() {
     </div>
   );
 }
-

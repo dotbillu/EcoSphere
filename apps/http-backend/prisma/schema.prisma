@@ -8,28 +8,28 @@ generator client {
 }
 
 model User {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   name        String
-  username    String    @unique
-  email       String    @unique
-  image       String? // profile
-  posterImage String? // poster
-  createdAt   DateTime  @default(now())
+  username    String   @unique
+  email       String   @unique
+  image       String?
+  posterImage String?
+  createdAt   DateTime @default(now())
 
-  posts    Post[]    @relation("UserPosts")
-  rooms    MapRoom[] @relation("UserRooms")
-  mapRooms MapRoom[] @relation("MapRoomCreator")
-  gigs     Gig[]     @relation("GigCreator")
-
-
-  followers User[]    @relation("UserFollows")
-  following User[]    @relation("UserFollows")
-
- 
-  likes     Like[]    @relation("UserLikes")
+  posts     Post[]   @relation("UserPosts")
+  rooms     MapRoom[] @relation("UserRooms")
+  mapRooms  MapRoom[] @relation("MapRoomCreator")
+  gigs      Gig[]    @relation("GigCreator")
+  followers User[]   @relation("UserFollows")
+  following User[]   @relation("UserFollows")
+  likes     Like[]   @relation("UserLikes")
   comments  Comment[] @relation("UserComments")
-}
 
+  groupMessages GroupMessage[]  @relation("UserGroupMessages")
+  sentDMs       DirectMessage[] @relation("SentDMs")
+  receivedDMs   DirectMessage[] @relation("ReceivedDMs")
+  reactions     Reaction[]
+}
 
 model Post {
   id        Int      @id @default(autoincrement())
@@ -50,10 +50,10 @@ model Post {
 
 model Like {
   id     Int  @id @default(autoincrement())
-  post   Post @relation("PostLikes", fields: [postId], references: [id])
+  post   Post @relation("PostLikes", fields: [postId], references: [id], onDelete: Cascade)
   postId Int
 
-  user   User @relation("UserLikes", fields: [userId], references: [id])
+  user   User @relation("UserLikes", fields: [userId], references: [id], onDelete: Cascade)
   userId Int
 
   createdAt DateTime @default(now())
@@ -64,15 +64,14 @@ model Like {
 model Comment {
   id      Int    @id @default(autoincrement())
   content String
-  post    Post   @relation("PostComments", fields: [postId], references: [id])
+  post    Post   @relation("PostComments", fields: [postId], references: [id], onDelete: Cascade)
   postId  Int
 
-  user    User   @relation("UserComments", fields: [userId], references: [id])
-  userId  Int
+  user   User @relation("UserComments", fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
 
   createdAt DateTime @default(now())
 }
-
 
 model MapRoom {
   id          Int      @id @default(autoincrement())
@@ -85,14 +84,13 @@ model MapRoom {
   createdBy User @relation("MapRoomCreator", fields: [creatorId], references: [id])
   creatorId Int
 
-  members User[] @relation("UserRooms")
-
-
-  posts    Post[]  @relation("RoomPosts")
+  members  User[] @relation("UserRooms")
+  posts    Post[] @relation("RoomPosts")
   type     String?
-
   imageUrl String?
-  gigs     Gig[]   @relation("RoomGigs")
+  gigs     Gig[]  @relation("RoomGigs")
+
+  groupMessages GroupMessage[] @relation("RoomGroupMessages")
 }
 
 model Gig {
@@ -101,12 +99,10 @@ model Gig {
   description String?
   latitude    Float
   longitude   Float
-
-  date      DateTime?
-  reward    String?
-  expiresAt DateTime?
-
-  createdAt DateTime @default(now())
+  date        DateTime?
+  reward      String?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
 
   createdBy User @relation("GigCreator", fields: [creatorId], references: [id])
   creatorId Int
@@ -114,7 +110,60 @@ model Gig {
   room   MapRoom? @relation("RoomGigs", fields: [roomId], references: [id])
   roomId Int?
 
-  type String?
-
+  type      String?
   imageUrls String[] @default([])
+}
+
+model GroupMessage {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+
+  sender   User   @relation("UserGroupMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId Int
+
+  room   MapRoom @relation("RoomGroupMessages", fields: [roomId], references: [id], onDelete: Cascade)
+  roomId Int
+
+  reactions Reaction[]
+
+  @@index([roomId])
+}
+
+model DirectMessage {
+  id          Int      @id @default(autoincrement())
+  content     String
+  createdAt   DateTime @default(now())
+
+  sender   User @relation("SentDMs", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId Int
+
+  recipient   User @relation("ReceivedDMs", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientId Int
+
+  reactions Reaction[]
+
+  @@index([senderId, recipientId])
+  @@index([recipientId, senderId])
+}
+
+model Reaction {
+  id        Int      @id @default(autoincrement())
+  emoji     String
+  createdAt DateTime @default(now())
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+
+  groupMessage   GroupMessage? @relation(fields: [groupMessageId], references: [id], onDelete: Cascade)
+  groupMessageId Int?
+
+  directMessage   DirectMessage? @relation(fields: [directMessageId], references: [id], onDelete: Cascade)
+  directMessageId Int?
+
+  @@unique([userId, groupMessageId, emoji])
+  @@unique([userId, directMessageId, emoji])
+  @@index([groupMessageId])
+  @@index([directMessageId])
+  @@index([userId])
 }

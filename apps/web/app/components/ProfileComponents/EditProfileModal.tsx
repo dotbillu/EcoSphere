@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { UserProfile } from "../store";
+import { UserProfile } from "@/store";
 import { X, Camera } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { API_BASE_URL } from "@/lib/constants";
 
 // Helper to get image URLs (same as profile page)
 const getImageUrl = (path: string | null | undefined) => {
   if (!path) return "";
   if (path.startsWith("http")) return path;
-  return `http://localhost:4000/uploads/${path}`;
+  return `${API_BASE_URL}/uploads/${path}`;
 };
 
 // --- Reusable Sub-Component 1: Image Upload Field ---
@@ -137,7 +138,7 @@ export default function EditProfileModal({
 
     try {
       const res = await fetch(
-        `http://localhost:4000/user/profile/${profile.username}`,
+        `${API_BASE_URL}/user/profile/${profile.username}`,
         {
           method: "PATCH",
           body: formData,

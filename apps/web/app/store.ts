@@ -1,5 +1,11 @@
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
+import {
+  SelectedConversation,
+  ChatMapRoom,
+  SimpleUser,
+  MessageType,
+} from "./lib/types";
 
 export type PageName = "House" | "Map" | "Search" | "Network" | "Activity";
 export const CurrentPageAtom = atom<PageName>("House");
@@ -82,36 +88,65 @@ export interface UserProfile {
   following: Following[];
 }
 
-export const followingListAtom = atomWithStorage<Following[]>("followingList", []);
+export const followingListAtom = atomWithStorage<Following[]>(
+  "followingList",
+  [],
+);
 
-export const toggleFollowAtom = atom(
-  null,
-  (get, set, username: string) => {
-    const user = get(userAtom);
-    if (!user) return;
+export const toggleFollowAtom = atom(null, (get, set, username: string) => {
+  const user = get(userAtom);
+  if (!user) return;
 
-    const currentList = get(followingListAtom);
-    const isFollowing = currentList.some(u => u.username === username);
+  const currentList = get(followingListAtom);
+  const isFollowing = currentList.some((u) => u.username === username);
 
-    if (isFollowing) {
-      set(followingListAtom, currentList.filter(u => u.username !== username));
+  if (isFollowing) {
+    set(
+      followingListAtom,
+      currentList.filter((u) => u.username !== username),
+    );
+  } else {
+    set(followingListAtom, [
+      ...currentList,
+      { id: Math.random(), username: username, name: username, image: null },
+    ]);
+  }
+
+  console.log(`Calling API to toggle follow for: ${username}`);
+});
+
+export const likePostAtom = atom(null, (get, set, postId: number) => {
+  const user = get(userAtom);
+  if (!user) return;
+
+  console.log(`Calling API to like post: ${postId}`);
+});
+
+// --- NEW ATOMS FOR NETWORK PAGE ---
+
+export const selectedConversationAtom = atom<SelectedConversation>(null);
+export const userRoomsAtom = atom<ChatMapRoom[]>([]);
+export const dmConversationsAtom = atom<SimpleUser[]>([]);
+export const messagesAtom = atom<MessageType[]>([]);
+
+export const networkLoadingAtom = atom(
+  (get) => ({
+    profile: get(profileLoadingAtom),
+    messages: get(messagesLoadingAtom),
+  }),
+  (get, set, update: { key: "profile" | "messages"; value: boolean }) => {
+    if (update.key === "profile") {
+      set(profileLoadingAtom, update.value);
     } else {
-      set(followingListAtom, [
-        ...currentList,
-        { id: Math.random(), username: username, name: username, image: null },
-      ]);
+      set(messagesLoadingAtom, update.value);
     }
-
-    console.log(`Calling API to toggle follow for: ${username}`);
   },
 );
+const profileLoadingAtom = atom<boolean>(true);
+const messagesLoadingAtom = atom<boolean>(false);
 
-export const likePostAtom = atom(
-  null,
-  (get, set, postId: number) => {
-    const user = get(userAtom);
-    if (!user) return;
+export const networkErrorAtom = atom<string | null>(null);
+export const isNewChatModalOpenAtom = atom<boolean>(false);
 
-    console.log(`Calling API to like post: ${postId}`);
-  },
-);
+export type NetworkFilter = "all" | "rooms" | "dms";
+export const networkFilterAtom = atom<NetworkFilter>("all");

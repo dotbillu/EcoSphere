@@ -7,9 +7,8 @@ import { locationAtom, userAtom } from "../../store";
 import NextImage from "next/image";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
+import { API_BASE_URL } from "@/lib/constants";
 
-// 1. UPDATED PROPS:
-// Renamed 'onPostSuccess' to 'onPostCreated' and expect it to take the new post
 export default function CreatePost({
   onPostCreated,
 }: {
@@ -118,7 +117,7 @@ export default function CreatePost({
     images.forEach((img) => formData.append("images", img));
 
     try {
-      const res = await fetch("http://localhost:4000/uploadPosts", {
+      const res = await fetch(`${API_BASE_URL}/uploadPosts`, {
         method: "POST",
         body: formData,
       });
@@ -163,7 +162,7 @@ export default function CreatePost({
               src={
                 user.image.startsWith("http")
                   ? user.image
-                  : `http://localhost:4000/uploads/${user.image}`
+                  : `${API_BASE_URL}/uploads/${user.image}`
               }
               alt={user.name}
               width={48}

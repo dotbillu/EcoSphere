@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import Provider from "./Provider";
-import Navbar from "./Components/Navbar";
+import Navbar from "@components/Navbar";
 import "./globals.css";
 
 export default function RootLayout({
@@ -15,10 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="bg-black">
-      {/* Set bg-black here */}
       <body className="bg-black min-h-screen">
-        {" "}
-        {/* Set bg-black here and ensure height */}
         <Provider>
           <SessionProvider>
             <AuthGuard>{children}</AuthGuard>
@@ -35,14 +32,12 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const path = usePathname();
 
   useEffect(() => {
-    // Redirect unauthenticated users away from restricted pages
     if (status === "unauthenticated" && path !== "/login") {
       router.replace("/login");
     }
   }, [status, path, router]);
 
   if (status === "loading") {
-    // Full screen black loading state
     return (
       <div className="fixed inset-0 bg-black flex items-center justify-center z-50 min-h-screen w-screen">
         <span className="loading loading-dots loading-xl text-white"></span>
@@ -50,21 +45,22 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Allow unauthenticated access only on the /login page
   if (status === "unauthenticated" && path === "/login") {
-    return <div className="bg-black min-h-screen w-screen">{children}</div>;
+    return (
+      <div className="bg-black min-h-screen w-screen flex flex-col">
+        {children}
+      </div>
+    );
   }
 
-  // Authenticated layout
   if (session) {
     return (
-      <div className="bg-black min-h-screen w-screen">
-        {children}
+      <div className="bg-black h-screen w-screen flex flex-col">
+        <div className="flex-1 overflow-y-auto">{children}</div>
         <Navbar />
       </div>
     );
   }
 
-  // Return null or a simple container while status is resolving on restricted pages
   return null;
 }

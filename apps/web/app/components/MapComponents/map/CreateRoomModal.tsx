@@ -3,6 +3,7 @@ import { useAtom } from "jotai";
 import { userAtom } from "../../../store";
 import { MapElement } from "./MapTypes";
 import { Loader2 } from "lucide-react";
+import { API_BASE_URL } from "@/lib/constants";
 
 type CreateRoomModalProps = {
   location: { lat: number; lng: number };
@@ -43,7 +44,7 @@ export default function CreateRoomModal({
     if (image) formData.append("image", image);
 
     try {
-      const res = await fetch("http://localhost:4000/map/room", {
+      const res = await fetch(`${API_BASE_URL}/map/room`, {
         method: "POST",
         body: formData,
       });

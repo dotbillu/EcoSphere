@@ -19,6 +19,7 @@ import { useState } from "react";
 import { getImageUrl } from "../../../lib/utils";
 import { GigElement, MapElement } from "./MapTypes";
 import { motion } from "framer-motion"; // <-- Import motion
+import { API_BASE_URL } from "@/lib/constants";
 
 type GigDetailSidebarProps = {
   gig: GigElement;
@@ -92,7 +93,7 @@ export default function GigDetailSidebar({
     setIsVerifying(true);
     setModalError(null);
     try {
-      const res = await fetch(`http://localhost:4000/map/room/${rId}`);
+      const res = await fetch(`${API_BASE_URL}/map/room/${rId}`);
       if (!res.ok) {
         throw new Error("Room not found.");
       }

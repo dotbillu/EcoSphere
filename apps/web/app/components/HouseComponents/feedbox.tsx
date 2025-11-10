@@ -39,6 +39,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getImageUrl } from "../../lib/utils";
 import SearchBar from "../SearchBar";
+import { API_BASE_URL } from "@/lib/constants";
 
 interface ActivityItemPost {
   type: "post";
@@ -86,7 +87,7 @@ const fetchGlobalActivity = async ({
   filters: FilterState;
 }): Promise<FeedPage> => {
   const res = await fetch(
-    `http://localhost:4000/global/feed?skip=${pageParam * 10}&take=10&posts=${filters.posts}&gigs=${filters.gigs}&rooms=${filters.rooms}`,
+    `${API_BASE_URL}/global/feed?skip=${pageParam * 10}&take=10&posts=${filters.posts}&gigs=${filters.gigs}&rooms=${filters.rooms}`,
   );
   if (!res.ok) throw new Error("Failed to fetch global activity");
   return res.json();
@@ -104,20 +105,20 @@ const fetchNetworkActivity = async ({
   if (!currentUserId) return { items: [], hasNextPage: false };
 
   const res = await fetch(
-    `http://localhost:4000/network/feed?userId=${currentUserId}&skip=${pageParam * 10}&take=10&posts=${filters.posts}&gigs=${filters.gigs}&rooms=${filters.rooms}`,
+    `${API_BASE_URL}/network/feed?userId=${currentUserId}&skip=${pageParam * 10}&take=10&posts=${filters.posts}&gigs=${filters.gigs}&rooms=${filters.rooms}`,
   );
   if (!res.ok) throw new Error("Failed to fetch network activity");
   return res.json();
 };
 
 const fetchPost = async (postId: number): Promise<Post> => {
-  const res = await fetch(`http://localhost:4000/posts/${postId}`);
+  const res = await fetch(`${API_BASE_URL}/posts/${postId}`);
   if (!res.ok) throw new Error("Failed to fetch post");
   return res.json();
 };
 
 const fetchProfile = async (username: string): Promise<UserProfile> => {
-  const res = await fetch(`http://localhost:4000/user/profile/${username}`);
+  const res = await fetch(`${API_BASE_URL}/user/profile/${username}`);
   if (!res.ok) throw new Error("Failed to fetch profile");
   return res.json();
 };
@@ -129,7 +130,7 @@ const toggleLike = async ({
   postId: number;
   currentUserId: number;
 }) => {
-  const res = await fetch(`http://localhost:4000/posts/${postId}/like`, {
+  const res = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId: currentUserId }),
@@ -145,7 +146,7 @@ const toggleFollow = async ({
   currentUserId: number;
   targetUsername: string;
 }) => {
-  const res = await fetch(`http://localhost:4000/user/follow`, {
+  const res = await fetch(`${API_BASE_URL}/user/follow`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ currentUserId, targetUsername }),

@@ -7,6 +7,7 @@ import { useAtom } from "jotai";
 import useDebounce from "../hooks/useDebounce";
 import SearchResults from "./SearchResults";
 import { userAtom } from "../store";
+import { API_BASE_URL } from '@/lib/constants'
 
 // --- Types ---
 // (You may want to move these to a shared types file)
@@ -64,7 +65,7 @@ const fetchSearch = async (
 ): Promise<SearchResult[]> => {
   if (query.trim().length < 2) return []; // Don't search for less than 2 chars
   const res = await fetch(
-    `http://localhost:4000/search?q=${encodeURIComponent(
+    `${API_BASE_URL}/search?q=${encodeURIComponent(
       query,
     )}&userId=${userId}&followersOnly=${followersOnly}`,
   );

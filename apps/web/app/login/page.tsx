@@ -4,7 +4,8 @@ import { signIn, useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAtom } from "jotai";
-import { userAtom, User } from "../store";
+import { userAtom, User } from "@/store";
+import { API_BASE_URL } from "@/lib/constants";
 
 export default function LoginPage() {
   const { data: session } = useSession();
@@ -16,7 +17,7 @@ export default function LoginPage() {
 
     const syncUser = async () => {
       try {
-        const res = await fetch("http://localhost:4000/user", {
+        const res = await fetch(`${API_BASE_URL}/user`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

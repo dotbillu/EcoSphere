@@ -21,6 +21,7 @@ import RoomDetailSidebar from "./map/RoomDetailSidebar";
 import Lightbox from "./map/Lightbox";
 import CreateRoomModal from "./map/CreateRoomModal";
 import CreateGigModal from "./map/CreateGigModal";
+import { API_BASE_URL } from "@/lib/constants";
 
 // Helper function
 const sanitizeCoords = (item: any) => {
@@ -120,8 +121,8 @@ export default function MapComponent() {
     const fetchData = async () => {
       try {
         const [roomRes, gigRes] = await Promise.all([
-          fetch("http://localhost:4000/map/rooms"),
-          fetch("http://localhost:4000/map/gigs"),
+          fetch(`${API_BASE_URL}/map/rooms`),
+          fetch(`${API_BASE_URL}/map/gigs`),
         ]);
         const roomsData = await roomRes.json();
         const gigsData = await gigRes.json();
@@ -163,7 +164,7 @@ export default function MapComponent() {
   const handleJoinRoom = async (roomId: number) => {
     if (!user) return alert("Login to join rooms");
     try {
-      const res = await fetch(`http://localhost:4000/map/room/${roomId}/join`, {
+      const res = await fetch(`${API_BASE_URL}/map/room/${roomId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.id }),
@@ -188,7 +189,7 @@ export default function MapComponent() {
     if (!selectedGig) return;
     try {
       const res = await fetch(
-        `http://localhost:4000/map/gig/${selectedGig.id}`,
+        `${API_BASE_URL}/map/gig/${selectedGig.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -216,7 +217,7 @@ export default function MapComponent() {
     if (!selectedRoom) return;
     try {
       const res = await fetch(
-        `http://localhost:4000/map/room/${selectedRoom.id}`,
+        `${API_BASE_URL}/map/room/${selectedRoom.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -264,7 +265,7 @@ export default function MapComponent() {
     if (!window.confirm(`Delete this ${type}?`)) return;
 
     try {
-      const res = await fetch(`http://localhost:4000/map/${type}/${el.id}`, {
+      const res = await fetch(`${API_BASE_URL}/map/${type}/${el.id}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("delete failed");

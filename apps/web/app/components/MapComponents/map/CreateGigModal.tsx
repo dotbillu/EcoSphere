@@ -5,6 +5,7 @@ import { useAtom } from "jotai";
 import { userAtom } from "../../../store";
 import { GigElement } from "./MapTypes";
 import { X, Loader2, Upload } from "lucide-react";
+import { API_BASE_URL } from "@/lib/constants";
 
 type CreateGigModalProps = {
   location: { lat: number; lng: number };
@@ -60,7 +61,7 @@ export default function CreateGigModal({
       Array.from(images).forEach((img) => formData.append("images", img));
 
     try {
-      const res = await fetch("http://localhost:4000/map/gig", {
+      const res = await fetch(`${API_BASE_URL}/map/gig`, {
         method: "POST",
         body: formData,
       });

@@ -5,6 +5,82 @@ import type { Router as ExpressRouter } from "express";
 
 const router: ExpressRouter = Router();
 
+const profileInclude = {
+  posts: {
+    orderBy: { createdAt: "desc" },
+    include: {
+      likes: { select: { userId: true } },
+      _count: { select: { likes: true, comments: true } },
+    },
+  },
+  rooms: {
+    include: {
+      groupMessages: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: {
+          sender: { select: { name: true } },
+        },
+      },
+    },
+  },
+  mapRooms: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      imageUrl: true,
+      latitude: true,
+      longitude: true,
+      type: true,
+    },
+  },
+  gigs: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      latitude: true,
+      longitude: true,
+      date: true,
+      imageUrls: true,
+      type: true,
+    },
+  },
+  followers: {
+    select: { id: true, username: true, name: true, image: true },
+  },
+  following: {
+    select: { id: true, username: true, name: true, image: true },
+  },
+};
+
+const formatProfileRooms = (profile: any) => {
+  if (!profile || !profile.rooms) return profile;
+
+  const formattedRooms = profile.rooms.map((room: any) => {
+    const lastMsg = room.groupMessages?.[0];
+    let lastMessageContent = null;
+
+    if (lastMsg) {
+      lastMessageContent = `${lastMsg.sender.name}: ${lastMsg.content}`;
+    }
+
+    const { groupMessages, ...restOfRoom } = room;
+    return {
+      ...restOfRoom,
+      lastMessage: lastMessageContent,
+      lastMessageTimestamp: lastMsg ? lastMsg.createdAt : null,
+    };
+  });
+
+  return {
+    ...profile,
+    rooms: formattedRooms,
+  };
+};
+
 router.post("/", async (req, res) => {
   const { name, email, image } = req.body;
 
@@ -42,80 +118,13 @@ router.get("/profile/:username", async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { username },
-      include: {
-        posts: {
-          orderBy: { createdAt: "desc" },
-          include: {
-            likes: {
-              select: {
-                userId: true,
-              },
-            },
-            _count: {
-              select: {
-                likes: true,
-                comments: true,
-              },
-            },
-          },
-        },
-        rooms: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            imageUrl: true,
-            latitude: true,
-            longitude: true,
-            type: true,
-          },
-        },
-        mapRooms: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            imageUrl: true,
-            latitude: true,
-            longitude: true,
-            type: true,
-          },
-        },
-        gigs: {
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            latitude: true,
-            longitude: true,
-            date: true,
-            imageUrls: true,
-            type: true,
-          },
-        },
-        followers: {
-          select: {
-            id: true,
-            username: true,
-            name: true,
-            image: true,
-          },
-        },
-        following: {
-          select: {
-            id: true,
-            username: true,
-            name: true,
-            image: true,
-          },
-        },
-      },
+      include: profileInclude,
     });
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json(user);
+    const formattedProfile = formatProfileRooms(user);
+    res.json(formattedProfile);
   } catch (err) {
     console.error("Error fetching user profile:", err);
     res.status(500).json({ message: "Internal server error" });
@@ -180,79 +189,12 @@ router.patch(
 
       const updatedFullProfile = await prisma.user.findUnique({
         where: { username },
-        include: {
-          posts: {
-            orderBy: { createdAt: "desc" },
-            include: {
-              likes: {
-                select: {
-                  userId: true,
-                },
-              },
-              _count: {
-                select: {
-                  likes: true,
-                  comments: true,
-                },
-              },
-            },
-          },
-          rooms: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              imageUrl: true,
-              latitude: true,
-              longitude: true,
-              type: true,
-            },
-          },
-          mapRooms: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              imageUrl: true,
-              latitude: true,
-              longitude: true,
-              type: true,
-            },
-          },
-          gigs: {
-            orderBy: { createdAt: "desc" },
-            select: {
-              id: true,
-              title: true,
-              description: true,
-              latitude: true,
-              longitude: true,
-              date: true,
-              imageUrls: true,
-              type: true,
-            },
-          },
-          followers: {
-            select: {
-              id: true,
-              username: true,
-              name: true,
-              image: true,
-            },
-          },
-          following: {
-            select: {
-              id: true,
-              username: true,
-              name: true,
-              image: true,
-            },
-          },
-        },
+        include: profileInclude,
       });
 
       console.log(`Updated profile for: ${username}`);
-      res.status(200).json(updatedFullProfile);
+      const formattedProfile = formatProfileRooms(updatedFullProfile);
+      res.status(200).json(formattedProfile);
     } catch (err) {
       console.error(`Error updating profile for ${username}:`, err);
       res.status(500).json({ message: "Internal server error" });
@@ -315,70 +257,13 @@ router.post("/follow", async (req, res) => {
 
     const updatedTargetProfile = await prisma.user.findUnique({
       where: { username: targetUsername },
-      include: {
-        posts: {
-          orderBy: { createdAt: "desc" },
-          include: {
-            likes: {
-              select: {
-                userId: true,
-              },
-            },
-            _count: {
-              select: {
-                likes: true,
-                comments: true,
-              },
-            },
-          },
-        },
-        rooms: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            imageUrl: true,
-            latitude: true,
-            longitude: true,
-            type: true,
-          },
-        },
-        mapRooms: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            imageUrl: true,
-            latitude: true,
-            longitude: true,
-            type: true,
-          },
-        },
-        gigs: {
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            latitude: true,
-            longitude: true,
-            date: true,
-            imageUrls: true,
-            type: true,
-          },
-        },
-        followers: {
-          select: { id: true, username: true, name: true, image: true },
-        },
-        following: {
-          select: { id: true, username: true, name: true, image: true },
-        },
-      },
+      include: profileInclude,
     });
-
+    
+    const formattedProfile = formatProfileRooms(updatedTargetProfile);
     res.status(200).json({
       message: actionMessage,
-      profile: updatedTargetProfile,
+      profile: formattedProfile,
     });
   } catch (err) {
     console.error("Error toggling follow:", err);
