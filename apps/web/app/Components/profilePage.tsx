@@ -6,6 +6,8 @@ import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useAtom } from "jotai"; // 1. Import useAtom
+import { userAtom } from "../store"; // 2. Import userAtom
 
 export default function ProfilePageWrapper() {
   const [mounted, setMounted] = useState(false);
@@ -84,6 +86,7 @@ function Avatar({ src }: { src?: string | null }) {
 function SideBarContent({ onLogout }: { onLogout: () => void }) {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [loggedInUser] = useAtom(userAtom); // 3. Get logged-in user from Jotai
 
   if (status === "loading") return null;
 
@@ -94,7 +97,15 @@ function SideBarContent({ onLogout }: { onLogout: () => void }) {
     {
       label: "Profile",
       icon: UserIcon,
-      action: () => router.push("/profile"),
+      // 4. FIX: Use the username from the Jotai atom
+      action: () => {
+        if (loggedInUser?.username) {
+          router.push(`/profile/${loggedInUser.username}`);
+        } else {
+          // Fallback, though this shouldn't be hit if user is logged in
+          console.error("No username found in userAtom");
+        }
+      },
       description: "View your profile",
     },
     {
@@ -199,4 +210,3 @@ function LogoutModal({
     </motion.div>
   );
 }
-

@@ -1,5 +1,3 @@
-// src/store.ts
-
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 
@@ -13,8 +11,6 @@ interface LocationState {
 
 export const locationAtom = atom<LocationState>({ lat: null, lng: null });
 
-// --- Base User Atom ---
-// This stores the basic info of the *logged-in* user
 export interface User {
   id: number;
   name: string;
@@ -22,23 +18,31 @@ export interface User {
   email: string;
   image?: string | null;
   createdAt: string;
-  // Note: We remove posts, gigs, etc. from here
-  // as they will be fetched in the full UserProfile
 }
 
 export const userAtom = atomWithStorage<User | null>("user", null);
 
-// --- Full Profile Data Types ---
-// These interfaces match your new backend response
+export interface Following {
+  id: number;
+  username: string;
+  name: string;
+  image: string | null;
+}
 
 export interface Post {
   id: number;
   username: string;
-  name: string;
+  name?: string;
   content: string;
+  createdAt: string;
   imageUrls: string[];
   location?: string;
-  createdAt: string;
+  user?: { image?: string; id?: number };
+  likes: { userId: number }[];
+  _count: {
+    likes: number;
+    comments: number;
+  };
 }
 
 export interface Gig {
@@ -47,7 +51,7 @@ export interface Gig {
   description: string | null;
   latitude: number;
   longitude: number;
-  date: string | null; // Dates come as strings from JSON
+  date: string | null;
   imageUrls: string[];
   type: string | null;
 }
@@ -62,10 +66,52 @@ export interface MapRoom {
   type: string | null;
 }
 
-// This is the main interface for the profile page
-export interface UserProfile extends User {
+export interface UserProfile {
+  id: number;
+  name: string;
+  username: string;
+  email: string;
+  image: string | null;
+  posterImage: string | null;
+  createdAt: string;
   posts: Post[];
   gigs: Gig[];
-  rooms: MapRoom[]; // Rooms user has joined
-  mapRooms: MapRoom[]; // Rooms user has created
+  rooms: MapRoom[];
+  mapRooms: MapRoom[];
+  followers: Following[];
+  following: Following[];
 }
+
+export const followingListAtom = atomWithStorage<Following[]>("followingList", []);
+
+export const toggleFollowAtom = atom(
+  null,
+  (get, set, username: string) => {
+    const user = get(userAtom);
+    if (!user) return;
+
+    const currentList = get(followingListAtom);
+    const isFollowing = currentList.some(u => u.username === username);
+
+    if (isFollowing) {
+      set(followingListAtom, currentList.filter(u => u.username !== username));
+    } else {
+      set(followingListAtom, [
+        ...currentList,
+        { id: Math.random(), username: username, name: username, image: null },
+      ]);
+    }
+
+    console.log(`Calling API to toggle follow for: ${username}`);
+  },
+);
+
+export const likePostAtom = atom(
+  null,
+  (get, set, postId: number) => {
+    const user = get(userAtom);
+    if (!user) return;
+
+    console.log(`Calling API to like post: ${postId}`);
+  },
+);

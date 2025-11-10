@@ -8,13 +8,6 @@ import NextImage from "next/image";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 
-// Assume the Post type is defined elsewhere or use 'any'
-// You likely have this type in your Feedbox component
-interface Post {
-  id: number;
-  // ... other post fields
-}
-
 // 1. UPDATED PROPS:
 // Renamed 'onPostSuccess' to 'onPostCreated' and expect it to take the new post
 export default function CreatePost({
@@ -210,8 +203,8 @@ export default function CreatePost({
           </div>
           <div className="flex justify-between items-center mt-3">
             <span className="text-gray-400 text-sm">{content.length}/5000</span>
-            <div className="flex gap-4 items-center relative text-blue-500">
-              <label className="cursor-pointer hover:text-blue-400">
+            <div className="flex gap-4 items-center relative text-white-500">
+              <label className="cursor-pointer hover:text-white-400">
                 <Image className="w-5 h-5" />
                 <input
                   type="file"
@@ -223,21 +216,19 @@ export default function CreatePost({
               </label>
               <button
                 onClick={handleLocationToggle}
-                className={`flex items-center gap-1 text-sm ${
+                className={`flex items-center gap-1 text-sm cursor-pointer ${
                   includeLocation
-                    ? "text-green-500 hover:text-green-400"
-                    : "hover:text-blue-400"
+                    ? "text-blue-500 hover:text-white-400"
+                    : "hover:text-white-400"
                 }`}
               >
                 <MapPin className="w-5 h-5" />
-                {includeLocation && locationName && (
-                  <span className="text-xs">{locationName}</span>
-                )}
+                
               </button>
               <button
                 onClick={handlePost}
                 disabled={loading || (!content.trim() && images.length === 0)}
-                className="btn btn-sm rounded-full bg-blue-500 text-white font-bold px-5 py-2 border-none hover:bg-blue-600 transition disabled:opacity-50 disabled:bg-blue-800"
+                className="btn btn-sm rounded-full bg-white-500 text-white font-bold px-5 py-2 border-none hover:bg-white-600 transition disabled:opacity-50 disabled:bg-white-800"
               >
                 {loading ? "Posting..." : "Post"}
               </button>

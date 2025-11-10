@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
-import { upload } from "../multer"; 
+import { upload } from "../multer";
 import type { Router as ExpressRouter } from "express";
 
 const router: ExpressRouter = Router();
 
-// --- GET ALL ROOMS (for map) ---
+// --- (FIXED) GET ALL ROOMS (for map) ---
 router.get("/rooms", async (req, res) => {
   try {
     const rooms = await prisma.mapRoom.findMany({
@@ -17,7 +17,24 @@ router.get("/rooms", async (req, res) => {
         longitude: true,
         type: true,
         imageUrl: true,
-        creatorId: true,
+        // creatorId: true, // No longer needed, use createdBy.id
+        // --- (NEW) Include the creator object ---
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            image: true,
+          },
+        },
+        members: { // Also include members
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            image: true,
+          }
+        }
       },
     });
     res.json(rooms);
@@ -32,11 +49,8 @@ router.get("/gigs", async (req, res) => {
   try {
     const gigs = await prisma.gig.findMany({
       where: {
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: new Date() } }, 
-        ],
-      }, 
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
       select: {
         id: true,
         title: true,
@@ -45,16 +59,31 @@ router.get("/gigs", async (req, res) => {
         longitude: true,
         date: true,
         type: true,
-        imageUrls: true, 
+        imageUrls: true,
         reward: true,
         expiresAt: true,
-        creatorId: true,
+        // creatorId: true, // No longer needed
+        createdBy: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            image: true,
+          },
+        },
+        room: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
       },
-    }); 
+    });
 
     const processedGigs = gigs.map((gig) => ({
       ...gig,
-      imageUrls: gig.imageUrls.slice(0, 1), 
+      imageUrls: gig.imageUrls.slice(0, 1),
     }));
 
     res.json(processedGigs);
@@ -99,16 +128,18 @@ router.post("/room", upload.single("image"), async (req, res) => {
         longitude: lon,
         type: type?.trim() || null,
         creatorId: cId,
-        imageUrl: imageFile ? `/uploads/${imageFile.filename}` : null,
-
-
+        imageUrl: imageFile ? imageFile.filename : null, // Store just filename
         members: {
-          connect: { id: cId },
+          connect: { id: cId }, // Automatically join creator
         },
       },
       include: {
-        createdBy: { select: { id: true, name: true } },
-        members: { select: { id: true, name: true } },
+        createdBy: {
+          select: { id: true, name: true, username: true, image: true },
+        },
+        members: {
+          select: { id: true, name: true, username: true, image: true },
+        },
       },
     });
 
@@ -121,6 +152,7 @@ router.post("/room", upload.single("image"), async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+
 // --- CREATE A NEW GIG ---
 router.post("/gig", upload.array("images", 5), async (req, res) => {
   const {
@@ -133,9 +165,9 @@ router.post("/gig", upload.array("images", 5), async (req, res) => {
     creatorId,
     roomId,
     reward,
-    expiresAt, 
+    expiresAt,
   } = req.body;
-  const imageFiles = req.files as Express.Multer.File[]; 
+  const imageFiles = req.files as Express.Multer.File[];
 
   if (!title || !latitude || !longitude || !creatorId) {
     return res.status(400).json({
@@ -146,10 +178,9 @@ router.post("/gig", upload.array("images", 5), async (req, res) => {
   try {
     const lat = parseFloat(latitude);
     const lon = parseFloat(longitude);
-    const cId = parseInt(creatorId, 10); 
-
+    const cId = parseInt(creatorId, 10);
     const rId = roomId ? parseInt(roomId, 10) : null;
-    const gigDate = date ? new Date(date) : null; 
+    const gigDate = date ? new Date(date) : null;
     const gigExpiresAt = expiresAt ? new Date(expiresAt) : null;
 
     if (
@@ -173,23 +204,32 @@ router.post("/gig", upload.array("images", 5), async (req, res) => {
       creatorId: cId,
       type,
       date: gigDate,
-      imageUrls, 
-      reward, 
-      expiresAt: gigExpiresAt, // Pass the new Date object or null
+      imageUrls,
+      reward,
+      expiresAt: gigExpiresAt,
     };
 
     if (rId && !isNaN(rId)) {
       data.room = { connect: { id: rId } };
     }
 
-    const newGig = await prisma.gig.create({ data });
+    const newGig = await prisma.gig.create({
+      data,
+      include: {
+        createdBy: {
+          select: { id: true, username: true, name: true, image: true },
+        },
+        room: { select: { id: true, name: true, type: true } },
+      },
+    });
     res.status(201).json(newGig);
   } catch (err) {
     console.error("Error creating gig:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
-// --- (NEW) JOIN A ROOM ---
+
+// --- (FIXED) JOIN A ROOM ---
 router.post("/room/:roomId/join", async (req, res) => {
   const { roomId } = req.params;
   const { userId } = req.body;
@@ -208,26 +248,39 @@ router.post("/room/:roomId/join", async (req, res) => {
         .json({ message: "Invalid ID format for room or user" });
     }
 
-    await prisma.mapRoom.update({
+    const updatedRoom = await prisma.mapRoom.update({
       where: { id: rId },
       data: {
         members: {
           connect: { id: uId },
         },
       },
+      // Include all the data the sidebar needs
+      include: {
+        createdBy: {
+          select: { id: true, name: true, username: true, image: true },
+        },
+        members: {
+          select: { id: true, name: true, username: true, image: true },
+        },
+      },
     });
 
-    res.status(200).json({ message: "User joined room successfully" });
+    // Send the full room object back
+    res.status(200).json({
+      message: "User joined room successfully",
+      room: updatedRoom,
+    });
   } catch (err) {
     console.error("Error joining room:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// --- (NEW) LEAVE A ROOM ---
+// --- LEAVE A ROOM ---
 router.post("/room/:roomId/leave", async (req, res) => {
   const { roomId } = req.params;
-  const { userId } = req.body; 
+  const { userId } = req.body;
 
   if (!userId) {
     return res.status(400).json({ message: "userId is required" });
@@ -243,39 +296,54 @@ router.post("/room/:roomId/leave", async (req, res) => {
         .json({ message: "Invalid ID format for room or user" });
     }
 
-    await prisma.mapRoom.update({
+    const updatedRoom = await prisma.mapRoom.update({
       where: { id: rId },
       data: {
         members: {
           disconnect: { id: uId },
         },
       },
+      include: {
+        createdBy: {
+          select: { id: true, name: true, username: true, image: true },
+        },
+        members: {
+          select: { id: true, name: true, username: true, image: true },
+        },
+      },
     });
 
-    res.status(200).json({ message: "User left room successfully" });
+    res.status(200).json({
+      message: "User left room successfully",
+      room: updatedRoom,
+    });
   } catch (err) {
     console.error("Error leaving room:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// ---  DELETE A ROOM ---
+// --- DELETE A ROOM ---
 router.delete("/room/:roomId", async (req, res) => {
   const { roomId } = req.params;
-
   try {
     const rId = parseInt(roomId, 10);
     if (isNaN(rId)) {
       return res.status(400).json({ message: "Invalid Room ID" });
     }
-
-    await prisma.gig.deleteMany({ where: { roomId: rId } });
-    await prisma.post.deleteMany({ where: { roomId: rId } });
-
+    // Need to disconnect relations first
+    await prisma.mapRoom.update({
+      where: { id: rId },
+      data: {
+        members: { set: [] },
+        posts: { set: [] },
+        gigs: { set: [] },
+      },
+    });
+    // Now delete the room
     await prisma.mapRoom.delete({
       where: { id: rId },
     });
-
     res.status(200).json({ message: "Room deleted successfully" });
   } catch (err) {
     console.error("Error deleting room:", err);
@@ -283,21 +351,17 @@ router.delete("/room/:roomId", async (req, res) => {
   }
 });
 
-// --- (NEW) DELETE A GIG ---
+// --- DELETE A GIG ---
 router.delete("/gig/:gigId", async (req, res) => {
   const { gigId } = req.params;
-
-
   try {
     const gId = parseInt(gigId, 10);
     if (isNaN(gId)) {
       return res.status(400).json({ message: "Invalid Gig ID" });
     }
-
     await prisma.gig.delete({
       where: { id: gId },
     });
-
     res.status(200).json({ message: "Gig deleted successfully" });
   } catch (err) {
     console.error("Error deleting gig:", err);
@@ -308,7 +372,7 @@ router.delete("/gig/:gigId", async (req, res) => {
 // --- EDIT A ROOM ---
 router.put("/room/:roomId", upload.single("image"), async (req, res) => {
   const { roomId } = req.params;
-  const { name, description, type, gigIds } = req.body; 
+  const { name, description, type } = req.body;
   const imageFile = req.file;
 
   try {
@@ -323,23 +387,19 @@ router.put("/room/:roomId", upload.single("image"), async (req, res) => {
       name: name?.trim() || existingRoom.name,
       description: description?.trim() || existingRoom.description,
       type: type?.trim() || existingRoom.type,
-      imageUrl: imageFile
-        ? `/uploads/${imageFile.filename}`
-        : existingRoom.imageUrl,
+      imageUrl: imageFile ? imageFile.filename : existingRoom.imageUrl,
     };
-
-    if (gigIds && Array.isArray(gigIds)) {
-      data.gigs = {
-        set: [], 
-        connect: gigIds.map((gId) => ({ id: parseInt(gId, 10) })),
-      };
-    }
 
     const updatedRoom = await prisma.mapRoom.update({
       where: { id },
       data,
       include: {
-        gigs: { select: { id: true, title: true } },
+        createdBy: {
+          select: { id: true, name: true, username: true, image: true },
+        },
+        members: {
+          select: { id: true, name: true, username: true, image: true },
+        },
       },
     });
 
@@ -377,7 +437,10 @@ router.put("/gig/:gigId", upload.array("images", 5), async (req, res) => {
           : existingGig.imageUrls,
     };
 
-    if (roomId) {
+    // Handle connect/disconnect for room
+    if (roomId === null) {
+      data.room = { disconnect: true };
+    } else if (roomId !== undefined) {
       const rId = parseInt(roomId, 10);
       if (!isNaN(rId)) data.room = { connect: { id: rId } };
     }
@@ -386,7 +449,10 @@ router.put("/gig/:gigId", upload.array("images", 5), async (req, res) => {
       where: { id },
       data,
       include: {
-        room: { select: { id: true, name: true } },
+        createdBy: {
+          select: { id: true, username: true, name: true, image: true },
+        },
+        room: { select: { id: true, name: true, type: true } },
       },
     });
 
@@ -396,5 +462,32 @@ router.put("/gig/:gigId", upload.array("images", 5), async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+// --- GET A SINGLE ROOM (for verification) ---
+router.get("/room/:roomId", async (req, res) => {
+  const { roomId } = req.params;
+  try {
+    const id = parseInt(roomId, 10);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+    const room = await prisma.mapRoom.findUnique({
+      where: { id },
+      include: {
+        createdBy: {
+          select: { id: true, name: true, username: true, image: true },
+        },
+        members: {
+          select: { id: true, name: true, username: true, image: true },
+        },
+      },
+    });
+
+    if (!room) return res.status(404).json({ message: "Room not found" });
+    res.json(room);
+  } catch (err) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 
 export default router;

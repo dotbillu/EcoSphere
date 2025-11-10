@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useAtom } from "jotai";
 import {
   GoogleMap,
   useJsApiLoader,
   MarkerF,
-  InfoWindowF,
 } from "@react-google-maps/api";
+import { useSearchParams, useRouter } from "next/navigation";
 import { locationAtom, userAtom } from "../../store";
-import { Home, Star } from "lucide-react";
+import { Home, Star, Layers } from "lucide-react";
 import Image from "next/image";
+import { AnimatePresence } from "framer-motion";
 
 import { getImageUrl } from "../../lib/utils";
 import { mapOptions } from "./map/mapOptions";
@@ -21,19 +22,15 @@ import Lightbox from "./map/Lightbox";
 import CreateRoomModal from "./map/CreateRoomModal";
 import CreateGigModal from "./map/CreateGigModal";
 
-// Helper function to sanitize any map element's coordinates
+// Helper function
 const sanitizeCoords = (item: any) => {
   if (!item) return null;
   const lat = parseFloat(item.latitude);
   const lng = parseFloat(item.longitude);
-
-  // Check if parsing failed
   if (isNaN(lat) || isNaN(lng)) {
     console.warn("Discarding item with invalid coordinates:", item);
-    return null; // This item will be filtered out
+    return null;
   }
-
-  // Return the item with guaranteed-number coordinates
   return { ...item, latitude: lat, longitude: lng };
 };
 
@@ -50,10 +47,16 @@ export default function MapComponent() {
 
   const [isRoomModalOpen, setRoomModalOpen] = useState(false);
   const [isGigModalOpen, setGigModalOpen] = useState(false);
-
-  const [joinStatus, setJoinStatus] = useState<Record<number, string>>({});
+  const [showRooms, setShowRooms] = useState(true);
+  const [showGigs, setShowGigs] = useState(true);
   const [isLightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  // This ref fixes the "double click" bug
+  const initialUrlProcessed = useRef(false);
 
   if (!apiKey) throw new Error("Google Maps API key missing...");
 
@@ -62,6 +65,7 @@ export default function MapComponent() {
     googleMapsApiKey: apiKey,
   });
 
+  // Icons
   const icons = useMemo(() => {
     if (!isLoaded) return null;
     return {
@@ -92,14 +96,13 @@ export default function MapComponent() {
     };
   }, [isLoaded]);
 
-  // --- GEOLOCATION ---
+  // Geolocation
   useEffect(() => {
     if (!("geolocation" in navigator)) {
       console.log("Geolocation not supported");
       setLocation({ lat: 28.4089, lng: 77.3178 });
       return;
     }
-
     navigator.geolocation.getCurrentPosition(
       (pos) =>
         setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
@@ -111,7 +114,7 @@ export default function MapComponent() {
     );
   }, [setLocation]);
 
-  // --- FETCH DATA ---
+  // Fetch Data
   useEffect(() => {
     if (!isLoaded) return;
     const fetchData = async () => {
@@ -120,11 +123,8 @@ export default function MapComponent() {
           fetch("http://localhost:4000/map/rooms"),
           fetch("http://localhost:4000/map/gigs"),
         ]);
-
         const roomsData = await roomRes.json();
         const gigsData = await gigRes.json();
-
-        // Sanitize and filter both arrays
         setRooms(roomsData.map(sanitizeCoords).filter(Boolean));
         setGigs(gigsData.map(sanitizeCoords).filter(Boolean));
       } catch (e) {
@@ -134,20 +134,114 @@ export default function MapComponent() {
     fetchData();
   }, [isLoaded]);
 
-  // --- HANDLERS ---
+  // Handle selecting item from URL on load
+  useEffect(() => {
+    if (
+      (gigs.length > 0 || rooms.length > 0) &&
+      !initialUrlProcessed.current
+    ) {
+      const gigIdFromUrl = searchParams.get("gigId");
+      const roomIdFromUrl = searchParams.get("roomId");
+
+      if (gigIdFromUrl) {
+        const gigToSelect = gigs.find(
+          (g) => g.id === parseInt(gigIdFromUrl, 10)
+        );
+        if (gigToSelect) setSelectedGig(gigToSelect);
+      } else if (roomIdFromUrl) {
+        const roomToSelect = rooms.find(
+          (r) => r.id === parseInt(roomIdFromUrl, 10)
+        );
+        if (roomToSelect) setSelectedRoom(roomToSelect);
+      }
+      initialUrlProcessed.current = true;
+    }
+  }, [gigs, rooms, searchParams]);
+
+  // --- ALL HANDLERS ---
+
   const handleJoinRoom = async (roomId: number) => {
     if (!user) return alert("Login to join rooms");
-    setJoinStatus((p) => ({ ...p, [roomId]: "Joining..." }));
     try {
       const res = await fetch(`http://localhost:4000/map/room/${roomId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.id }),
       });
-      if (!res.ok) throw new Error("Failed to join");
-      setJoinStatus((p) => ({ ...p, [roomId]: "Joined" }));
-    } catch {
-      setJoinStatus((p) => ({ ...p, [roomId]: "Error" }));
+      if (!res.ok) throw new Error("Failed to join room");
+
+      const { room: updatedRoom } = await res.json();
+      const sanitizedRoom = sanitizeCoords(updatedRoom) as MapElement;
+
+      setRooms((prev) =>
+        prev.map((r) => (r.id === sanitizedRoom.id ? sanitizedRoom : r))
+      );
+      setSelectedRoom(sanitizedRoom);
+    } catch (err) {
+      console.error("Error joining room:", err);
+    }
+  };
+
+  const handleSaveGigEdit = async (
+    updatedData: Partial<GigElement> & { roomId?: number | null }
+  ) => {
+    if (!selectedGig) return;
+    try {
+      const res = await fetch(
+        `http://localhost:4000/map/gig/${selectedGig.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedData),
+        }
+      );
+      if (!res.ok) throw new Error("Failed to update gig");
+
+      const { gig: updatedGig } = await res.json();
+      const sanitizedGig = sanitizeCoords(updatedGig) as GigElement;
+
+      setGigs((prev) =>
+        prev.map((g) => (g.id === sanitizedGig.id ? sanitizedGig : g))
+      );
+      setSelectedGig(sanitizedGig);
+    } catch (err) {
+      console.error("Error saving gig:", err);
+    }
+  };
+
+  const handleSaveRoomEdit = async (updatedData: {
+    name: string;
+    description: string;
+  }) => {
+    if (!selectedRoom) return;
+    try {
+      const res = await fetch(
+        `http://localhost:4000/map/room/${selectedRoom.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedData),
+        }
+      );
+      if (!res.ok) throw new Error("Failed to update room");
+
+      const { room: updatedRoom } = await res.json();
+      const sanitizedRoom = sanitizeCoords(updatedRoom) as MapElement;
+
+      setRooms((prev) =>
+        prev.map((r) => (r.id === sanitizedRoom.id ? sanitizedRoom : r))
+      );
+      setSelectedRoom(sanitizedRoom);
+    } catch (err) {
+      console.error("Error saving room:", err);
+    }
+  };
+
+  const handleSelectRoomFromSidebar = (room: MapElement) => {
+    if (room) {
+      setSelectedGig(null);
+      setSelectedRoom(room);
+      router.push(`/map?roomId=${room.id}`, { scroll: false });
     }
   };
 
@@ -155,14 +249,17 @@ export default function MapComponent() {
     if (!el) return;
     const { latitude, longitude } = el;
     window.open(
-      `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`,
+      `http://googleusercontent.com/maps/google.com/0{latitude},${longitude}`,
       "_blank"
     );
   };
 
   const handleDelete = async (el: MapElement | GigElement | null) => {
     if (!el || !user) return;
-    if (user.id !== el.creatorId) return alert("You can delete only your items");
+    // This check now works for both gigs and rooms
+    if (user.id !== el.createdBy?.id)
+      return alert("You can delete only your items");
+      
     const type = "title" in el ? "gig" : "room";
     if (!window.confirm(`Delete this ${type}?`)) return;
 
@@ -174,8 +271,13 @@ export default function MapComponent() {
       type === "gig"
         ? setGigs((prev) => prev.filter((g) => g.id !== el.id))
         : setRooms((prev) => prev.filter((r) => r.id !== el.id));
-      if (type === "gig") setSelectedGig(null);
-      else setSelectedRoom(null);
+
+      if (type === "gig") {
+        setSelectedGig(null);
+      } else {
+        setSelectedRoom(null);
+      }
+      router.push(`/map`, { scroll: false });
     } catch (e) {
       console.error(e);
     }
@@ -186,19 +288,16 @@ export default function MapComponent() {
     setLightboxOpen(true);
   };
 
-  // --- (FIXED) ROBUST CENTER CALCULATION ---
   const center = useMemo(() => {
     const lat = parseFloat(location.lat as any);
     const lng = parseFloat(location.lng as any);
-
     if (!isNaN(lat) && !isNaN(lng)) {
       return { lat, lng };
     }
-    // Fallback default
-    return { lat: 28.4089, lng: 77.3178 };
+    return { lat: 28.4089, lng: 77.3178 }; // Fallback
   }, [location]);
 
-  // --- RENDER STATES ---
+  // Render states
   if (permissionDenied)
     return (
       <div className="flex h-full w-full items-center justify-center bg-zinc-900 text-white">
@@ -214,29 +313,42 @@ export default function MapComponent() {
     );
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full font-inter">
       {/* SIDEBARS */}
-      {selectedGig && (
-        <GigDetailSidebar
-          gig={selectedGig}
-          currentUserId={user?.id}
-          onClose={() => setSelectedGig(null)}
-          onNavigate={() => handleNavigate(selectedGig)}
-          onDelete={() => handleDelete(selectedGig)}
-          onShowLightbox={handleOpenLightbox}
-        />
-      )}
+      <AnimatePresence>
+        {selectedGig && (
+          <GigDetailSidebar
+            key="gig-sidebar"
+            gig={selectedGig}
+            currentUserId={user?.id}
+            onClose={() => {
+              setSelectedGig(null);
+              router.push(`/map`, { scroll: false });
+            }}
+            onNavigate={() => handleNavigate(selectedGig)}
+            onDelete={() => handleDelete(selectedGig)}
+            onShowLightbox={handleOpenLightbox}
+            onSaveEdit={handleSaveGigEdit}
+            onSelectRoom={handleSelectRoomFromSidebar}
+          />
+        )}
 
-      {selectedRoom && (
-        <RoomDetailSidebar
-          room={selectedRoom}
-          currentUserId={user?.id}
-          onClose={() => setSelectedRoom(null)}
-          onNavigate={() => handleNavigate(selectedRoom)}
-          onDelete={() => handleDelete(selectedRoom)}
-          onJoin={() => handleJoinRoom(selectedRoom.id)}
-        />
-      )}
+        {selectedRoom && (
+          <RoomDetailSidebar
+            key="room-sidebar"
+            room={selectedRoom}
+            currentUserId={user?.id}
+            onClose={() => {
+              setSelectedRoom(null);
+              router.push(`/map`, { scroll: false });
+            }}
+            onNavigate={() => handleNavigate(selectedRoom)}
+            onDelete={() => handleDelete(selectedRoom)}
+            onJoin={() => handleJoinRoom(selectedRoom.id)}
+            onSaveEdit={handleSaveRoomEdit}
+          />
+        )}
+      </AnimatePresence>
 
       {isLightboxOpen && selectedGig && (
         <Lightbox
@@ -246,19 +358,54 @@ export default function MapComponent() {
         />
       )}
 
-      {/* TOP BUTTONS */}
-      <div className="absolute top-4 right-4 z-20 flex gap-2">
+      {/* TOP-RIGHT LAYER TOGGLES */}
+      <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 rounded-lg bg-zinc-900/80 p-2 backdrop-blur-md border border-zinc-700 shadow-lg">
         <button
-          onClick={() => setRoomModalOpen(true)}
-          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-full shadow-md flex items-center gap-2"
+          onClick={() => setShowRooms(!showRooms)}
+          className={`flex items-center justify-between gap-4 px-3 py-2 rounded-md transition duration-200 ${
+            showRooms
+              ? "bg-zinc-700 text-emerald-400"
+              : "bg-transparent hover:bg-zinc-800 text-zinc-400"
+          }`}
         >
-          <Home size={18} /> Create Room
+          <span className="text-sm font-medium">Rooms</span>
+          <Home
+            size={18}
+            className={showRooms ? "text-emerald-400" : "text-zinc-500"}
+          />
         </button>
         <button
-          onClick={() => setGigModalOpen(true)}
-          className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-full shadow-md flex items-center gap-2"
+          onClick={() => setShowGigs(!showGigs)}
+          className={`flex items-center justify-between gap-4 px-3 py-2 rounded-md transition duration-200 ${
+            showGigs
+              ? "bg-zinc-700 text-amber-400"
+              : "bg-transparent hover:bg-zinc-800 text-zinc-400"
+          }`}
         >
-          <Star size={18} /> Create Gig
+          <span className="text-sm font-medium">Gigs</span>
+          <Star
+            size={18}
+            className={showGigs ? "text-amber-400" : "text-zinc-500"}
+          />
+        </button>
+      </div>
+
+      {/* TOP-LEFT 'CREATE' BUTTONS */}
+      <div className="absolute top-4 left-4 z-20 flex items-center bg-white rounded-xl p-[2px] shadow-xl">
+        <button
+          onClick={() => setRoomModalOpen(true)}
+          className="px-3 py-2 bg-white hover:bg-zinc-100 text-black rounded-xl flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer"
+        >
+          <Home size={16} strokeWidth={2} className="text-zinc-700" />
+          <span className="text-sm">Create Room</span>
+        </button>
+        <div className="w-px h-5 bg-zinc-200 mx-[2px]"></div>
+        <button
+          onClick={() => setGigModalOpen(true)}
+          className="px-3 py-2 bg-white hover:bg-zinc-100 text-black rounded-xl flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer"
+        >
+          <Star size={16} strokeWidth={2} className="text-zinc-700" />
+          <span className="text-sm">Create Gig</span>
         </button>
       </div>
 
@@ -271,45 +418,47 @@ export default function MapComponent() {
         onClick={() => {
           setSelectedGig(null);
           setSelectedRoom(null);
+          router.push(`/map`, { scroll: false });
         }}
       >
-        {/* User Marker */}
         <MarkerF position={center} icon={icons.user} zIndex={2} />
 
-        {/* Room Markers */}
-        {rooms.map((r) => (
-          <MarkerF
-            key={`room-${r.id}`}
-            position={{ lat: r.latitude, lng: r.longitude }}
-            icon={icons.room}
-            onClick={() => {
-              setSelectedRoom(r);
-              setSelectedGig(null);
-            }}
-            zIndex={5}
-          />
-        ))}
+        {showRooms &&
+          rooms.map((r) => (
+            <MarkerF
+              key={`room-${r.id}`}
+              position={{ lat: r.latitude, lng: r.longitude }}
+              icon={icons.room}
+              onClick={() => {
+                setSelectedRoom(r);
+                setSelectedGig(null);
+                router.push(`/map?roomId=${r.id}`, { scroll: false });
+              }}
+              zIndex={5}
+            />
+          ))}
 
-        {/* Gig Markers */}
-        {gigs.map((g) => (
-          <MarkerF
-            key={`gig-${g.id}`}
-            position={{ lat: g.latitude, lng: g.longitude }}
-            icon={
-              g.imageUrls?.[0]
-                ? {
-                    url: getImageUrl(g.imageUrls[0]),
-                    scaledSize: new google.maps.Size(32, 32),
-                  }
-                : icons.gig
-            }
-            onClick={() => {
-              setSelectedGig(g);
-              setSelectedRoom(null);
-            }}
-            zIndex={5}
-          />
-        ))}
+        {showGigs &&
+          gigs.map((g) => (
+            <MarkerF
+              key={`gig-${g.id}`}
+              position={{ lat: g.latitude, lng: g.longitude }}
+              icon={
+                g.imageUrls?.[0]
+                  ? {
+                      url: getImageUrl(g.imageUrls[0]),
+                      scaledSize: new google.maps.Size(32, 32),
+                    }
+                  : icons.gig
+              }
+              onClick={() => {
+                setSelectedGig(g);
+                setSelectedRoom(null);
+                router.push(`/map?gigId=${g.id}`, { scroll: false });
+              }}
+              zIndex={5}
+            />
+          ))}
       </GoogleMap>
 
       {/* CREATE MODALS */}
@@ -318,7 +467,6 @@ export default function MapComponent() {
           location={location}
           onClose={() => setRoomModalOpen(false)}
           onSuccess={(newRoom) => {
-            // --- (FIXED) SANITIZE NEW ROOM ---
             const sanitizedRoom = sanitizeCoords(newRoom);
             if (sanitizedRoom) {
               setRooms((p) => [...p, sanitizedRoom as MapElement]);
@@ -332,7 +480,6 @@ export default function MapComponent() {
           location={location}
           onClose={() => setGigModalOpen(false)}
           onSuccess={(newGig) => {
-            // --- (FIXED) SANITIZE NEW GIG ---
             const sanitizedGig = sanitizeCoords(newGig);
             if (sanitizedGig) {
               setGigs((p) => [...p, sanitizedGig as GigElement]);

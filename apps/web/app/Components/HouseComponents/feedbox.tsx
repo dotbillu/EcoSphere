@@ -2,92 +2,244 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import CreatePost from "./createPost";
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  MapPin,
+  Loader2,
+  Filter,
   X,
   ChevronLeft,
   ChevronRight,
-  Heart,
-  MessageCircle,
-  Loader2, 
+  MapPin,
+  Calendar,
+  DollarSign,
+  Tag,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
-
 import { useAtom } from "jotai";
-import { userAtom, User } from "../../store";
+import {
+  User,
+  UserProfile,
+  Post,
+  Gig,
+  MapRoom,
+  Following,
+  userAtom,
+} from "../../store";
 import { useRouter } from "next/navigation";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+  useQuery,
+} from "@tanstack/react-query";
+import PostEntry from "./PostEntry";
+import Image from "next/image";
+import Link from "next/link";
+import { getImageUrl } from "../../lib/utils";
+import SearchBar from "../SearchBar";
 
-
-
-interface Comment {
-  id: number;
-  content: string;
-  userId: number;
-  user: {
-    username: string;
-    image?: string | null;
+interface ActivityItemPost {
+  type: "post";
+  data: Post & { createdAt: string };
+}
+interface ActivityItemGig {
+  type: "gig";
+  data: Gig & {
+    createdAt: string;
+    imageUrls: string[];
+    createdBy: Following;
+    reward?: string;
+    type?: string;
+    date: string;
   };
 }
-interface Like {
-  userId: number;
-}
-interface Post {
-  id: number;
-  username: string;
-  name?: string;
-  content: string;
-  imageUrls: string[];
-  createdAt: string;
-  location?: string;
-  user: {
-    image?: string | null;
-  };
-  likes: Like[];
-  comments: Comment[];
-  _count: {
-    likes: number;
-    comments: number;
+interface ActivityItemRoom {
+  type: "room";
+  data: MapRoom & {
+    createdAt: string;
+    imageUrl: string | null;
+    createdBy: Following;
+    type?: string;
   };
 }
 
+type ActivityItem = ActivityItemPost | ActivityItemGig | ActivityItemRoom;
 
-
-interface PostEntryProps {
-  post: Post;
-  currentUserId?: number;
-  onLikeToggle: (postId: number) => void; 
-  onNavigate: (postId: number) => void; 
+interface FeedPage {
+  items: ActivityItem[];
+  hasNextPage: boolean;
 }
 
-const PostEntry = React.forwardRef<
-  HTMLDivElement,
-  PostEntryProps & { ref?: React.Ref<HTMLDivElement> }
->(({ post, currentUserId, onLikeToggle, onNavigate }, ref) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [needsTruncation, setNeedsTruncation] = useState(false);
-  const contentRef = useRef<HTMLParagraphElement>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalImageIndex, setModalImageIndex] = useState(0);
+interface FilterState {
+  posts: boolean;
+  gigs: boolean;
+  rooms: boolean;
+}
 
-  const isLikedByCurrentUser = post.likes.some(
-    (like) => like.userId === currentUserId,
+const fetchGlobalActivity = async ({
+  pageParam = 0,
+  filters,
+}: {
+  pageParam: number;
+  filters: FilterState;
+}): Promise<FeedPage> => {
+  const res = await fetch(
+    `http://localhost:4000/global/feed?skip=${pageParam * 10}&take=10&posts=${filters.posts}&gigs=${filters.gigs}&rooms=${filters.rooms}`,
   );
+  if (!res.ok) throw new Error("Failed to fetch global activity");
+  return res.json();
+};
 
-  useEffect(() => {
-    if (contentRef.current) {
-      const hasOverflow =
-        contentRef.current.scrollHeight > contentRef.current.clientHeight;
-      if (!isExpanded) setNeedsTruncation(hasOverflow);
-    }
-  }, [post.content, isExpanded]);
+const fetchNetworkActivity = async ({
+  pageParam = 0,
+  currentUserId,
+  filters,
+}: {
+  pageParam: number;
+  currentUserId: number;
+  filters: FilterState;
+}): Promise<FeedPage> => {
+  if (!currentUserId) return { items: [], hasNextPage: false };
 
-  const stopPropagation = (e: React.MouseEvent) => {
+  const res = await fetch(
+    `http://localhost:4000/network/feed?userId=${currentUserId}&skip=${pageParam * 10}&take=10&posts=${filters.posts}&gigs=${filters.gigs}&rooms=${filters.rooms}`,
+  );
+  if (!res.ok) throw new Error("Failed to fetch network activity");
+  return res.json();
+};
+
+const fetchPost = async (postId: number): Promise<Post> => {
+  const res = await fetch(`http://localhost:4000/posts/${postId}`);
+  if (!res.ok) throw new Error("Failed to fetch post");
+  return res.json();
+};
+
+const fetchProfile = async (username: string): Promise<UserProfile> => {
+  const res = await fetch(`http://localhost:4000/user/profile/${username}`);
+  if (!res.ok) throw new Error("Failed to fetch profile");
+  return res.json();
+};
+
+const toggleLike = async ({
+  postId,
+  currentUserId,
+}: {
+  postId: number;
+  currentUserId: number;
+}) => {
+  const res = await fetch(`http://localhost:4000/posts/${postId}/like`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: currentUserId }),
+  });
+  if (!res.ok) throw new Error("Failed to toggle like");
+  return res.json();
+};
+
+const toggleFollow = async ({
+  currentUserId,
+  targetUsername,
+}: {
+  currentUserId: number;
+  targetUsername: string;
+}) => {
+  const res = await fetch(`http://localhost:4000/user/follow`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ currentUserId, targetUsername }),
+  });
+  if (!res.ok) {
+    throw new Error("Failed to toggle follow");
+  }
+  return res.json();
+};
+
+const FilterToggle = ({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+}) => (
+  <label className="flex items-center space-x-2 cursor-pointer text-sm text-white hover:text-white-400 transition-colors">
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={onChange}
+      className="form-checkbox h-4 w-4 rounded bg-zinc-700 border-zinc-600 text-white-500 focus:ring-white-500"
+    />
+    <span>{label}</span>
+  </label>
+);
+
+const DescriptionExpander = ({ content }: { content: string }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const lineClampClass = "line-clamp-3";
+  const needsTruncation = content.length > 150;
+
+  if (!content) return null;
+
+  const shouldShowButton = needsTruncation && !isExpanded;
+
+  return (
+    <div className="mt-2">
+      <p
+        className={`text-zinc-200 whitespace-pre-wrap break-words ${shouldShowButton ? lineClampClass : ""}`}
+      >
+        {content}
+      </p>
+      {needsTruncation && (
+        <button
+          onClick={() => setIsExpanded((prev) => !prev)}
+          className="text-white-500 hover:underline mt-1 text-sm font-medium flex items-center"
+        >
+          {isExpanded ? (
+            <>
+              Show Less <ChevronUp size={16} className="ml-1" />
+            </>
+          ) : (
+            <>
+              Know More <ChevronDown size={16} className="ml-1" />
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+};
+
+export default function Feedbox() {
+  const [user] = useAtom(userAtom);
+  const currentUserId = user?.id;
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const observer = useRef<IntersectionObserver | null>(null);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalImages, setModalImages] = useState<string[]>([]);
+  const [modalImageIndex, setModalImageIndex] = useState(0);
+  const [feedMode, setFeedMode] = useState<"global" | "network">("global");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<FilterState>({
+    posts: true,
+    gigs: true,
+    rooms: true,
+  });
+
+  // [NEW] Ref to hold the like debounce timer, mimicking Profile.tsx
+  const likeDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  // [REMOVED] const [pendingLikeToggle, setPendingLikeToggle] = useState<...>(null);
+
+  const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
+
+  const openModal = (e: React.MouseEvent, images: string[], index: number) => {
     e.stopPropagation();
-  };
-
-  const openModal = (e: React.MouseEvent, index: number) => {
-    e.stopPropagation();
+    setModalImages(images);
     setModalImageIndex(index);
     setIsModalOpen(true);
   };
@@ -98,241 +250,479 @@ const PostEntry = React.forwardRef<
   const showNextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
     setModalImageIndex((prev) =>
-      prev < post.imageUrls.length - 1 ? prev + 1 : 0,
+      prev < modalImages.length - 1 ? prev + 1 : 0,
     );
   };
   const showPrevImage = (e: React.MouseEvent) => {
     e.stopPropagation();
     setModalImageIndex((prev) =>
-      prev > 0 ? prev - 1 : post.imageUrls.length - 1,
+      prev > 0 ? prev - 1 : modalImages.length - 1,
     );
   };
-  const renderImageGrid = () => {
-    const count = post.imageUrls.length;
-    if (count === 0) return null;
-    const gridBase =
-      "relative w-full max-w-xl h-80 rounded-2xl overflow-hidden mt-3 border border-gray-700";
-    if (count === 1) {
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        filterMenuRef.current &&
+        !filterMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsFilterOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleFilterChange = (filterName: keyof FilterState) => {
+    setFilters((prevFilters) => ({
+      ...prevFilters,
+      [filterName]: !prevFilters[filterName],
+    }));
+  };
+
+  const { data: loggedInUserProfile } = useQuery<UserProfile>({
+    queryKey: ["profile", user?.username],
+    queryFn: () => fetchProfile(user!.username),
+    enabled: !!user?.username,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const {
+    data: activityData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isError,
+  } = useInfiniteQuery({
+    queryKey: ["activity", feedMode, currentUserId, filters],
+    queryFn: ({ pageParam }) => {
+      if (feedMode === "global") {
+        return fetchGlobalActivity({ pageParam: pageParam as number, filters });
+      } else {
+        if (!currentUserId) return { items: [], hasNextPage: false };
+        return fetchNetworkActivity({
+          pageParam: pageParam as number,
+          currentUserId: currentUserId,
+          filters,
+        });
+      }
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const currentPageIndex = allPages.length;
+      return lastPage.hasNextPage ? currentPageIndex : undefined;
+    },
+    enabled:
+      feedMode === "global" || (feedMode === "network" && !!currentUserId),
+  });
+
+  const feedItems = activityData?.pages.flatMap((page) => page.items) ?? [];
+
+  const likeMutation = useMutation({
+    mutationFn: toggleLike,
+    onMutate: async ({ postId, currentUserId }) => {
+      // Note: The optimistic update is now primarily in handleLikeToggle,
+      // but we cancel and return previous data here for rollback.
+      await queryClient.cancelQueries({ queryKey: ["activity"] });
+      
+      const queryKey = ["activity", feedMode, currentUserId, filters];
+      const previousActivity = queryClient.getQueryData(queryKey);
+
+      // We skip the complex optimistic setQueryData here because it's already done
+      // in the handler (handleLikeToggle) for immediate visual feedback.
+      // This onMutate is primarily for saving rollback data.
+      
+      return { previousActivity, queryKey };
+    },
+    onError: (err, variables, context: any) => {
+      // Rollback to previous state
+      if (context?.previousActivity) {
+        queryClient.setQueryData(
+          context.queryKey,
+          context.previousActivity
+        );
+      }
+      console.error("Like toggle failed:", err);
+    },
+    onSettled: () => {
+      // Ensure data is eventually consistent, regardless of success/failure
+      queryClient.invalidateQueries({ queryKey: ["activity"] });
+    },
+  });
+
+  const followMutation = useMutation({
+    mutationFn: toggleFollow,
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["activity"] });
+    },
+  });
+
+  // [UPDATED] Like Handler uses optimistic update and debounced mutation (mimicking Profile.tsx)
+  const handleLikeToggle = (postId: number) => {
+    if (!currentUserId) return;
+    const queryKey = ["activity", feedMode, currentUserId, filters];
+
+    // 1. Optimistic Update (immediate UI change)
+    queryClient.setQueryData<any>(queryKey, (oldData) => {
+      if (!oldData) return;
+      
+      return {
+        ...oldData,
+        pages: oldData.pages.map((page: FeedPage) => ({
+          ...page,
+          items: page.items.map((item) => {
+            if (item.type === "post" && item.data.id === postId) {
+              const post = item.data as Post;
+              const isLiked = post.likes.some((like: any) => like.userId === currentUserId);
+              
+              const optimisticLikeEntry = { userId: currentUserId, postId: postId };
+
+              if (isLiked) {
+                // Optimistically unlike
+                return {
+                  ...item,
+                  data: {
+                    ...post,
+                    likes: post.likes.filter((like: any) => like.userId !== currentUserId),
+                    _count: { ...post._count, likes: post._count.likes - 1 },
+                  },
+                };
+              } else {
+                // Optimistically like
+                return {
+                  ...item,
+                  data: {
+                    ...post,
+                    likes: [...post.likes, optimisticLikeEntry],
+                    _count: { ...post._count, likes: post._count.likes + 1 },
+                  },
+                };
+              }
+            }
+            return item;
+          }),
+        })),
+      };
+    });
+
+    // 2. Clear any pending network request
+    if (likeDebounceTimer.current) {
+      clearTimeout(likeDebounceTimer.current);
+    }
+
+    // 3. Set a new timer to send the actual request via mutation
+    likeDebounceTimer.current = setTimeout(() => {
+      likeMutation.mutate({
+        postId: postId,
+        currentUserId: currentUserId,
+      });
+    }, 1000); // 1-second debounce delay
+  };
+
+  // [REMOVED] The old useEffect for debouncing is removed as the logic is in handleLikeToggle
+
+  const handleFollowToggle = (targetUsername: string) => {
+    if (!currentUserId) return;
+    followMutation.mutate({ currentUserId, targetUsername });
+  };
+  const handleNavigateToPost = (postId: number) => {
+    queryClient.prefetchQuery({
+      queryKey: ["post", postId],
+      queryFn: () => fetchPost(postId),
+    });
+    router.push(`/post/${postId}`);
+  };
+  const onPostCreated = () => {
+    queryClient.invalidateQueries({ queryKey: ["activity"] });
+  };
+  const handlePrefetchProfile = useCallback(
+    (username: string) => {
+      queryClient.prefetchQuery({
+        queryKey: ["profile", username],
+        queryFn: () => fetchProfile(username),
+      });
+    },
+    [queryClient],
+  );
+  const handlePrefetchPost = useCallback(
+    (postId: number) => {
+      queryClient.prefetchQuery({
+        queryKey: ["post", postId],
+        queryFn: () => fetchPost(postId),
+      });
+    },
+    [queryClient],
+  );
+
+  const handleNavigateToMapItem = (type: "gig" | "room", id: number) => {
+    router.push(`/map?${type}Id=${id}`);
+  };
+
+  const lastItemRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (isFetchingNextPage) return;
+      if (observer.current) observer.current.disconnect();
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasNextPage) {
+          fetchNextPage();
+        }
+      });
+      if (node) observer.current.observe(node);
+    },
+    [isFetchingNextPage, hasNextPage, fetchNextPage],
+  );
+
+  const renderActivityItem = (item: ActivityItem, index: number) => {
+    const isLast = index === feedItems.length - 1;
+
+    if (item.type === "post") {
       return (
-        <div
-          className={`${gridBase} cursor-pointer`}
-          onClick={(e) => openModal(e, 0)}
-        >
-          <Image
-            src={`http://localhost:4000/uploads/${post.imageUrls[0]}`}
-            alt="Post image"
-            fill
-            style={{ objectFit: "cover" }}
-          />
-        </div>
+        <PostEntry
+          key={`post-${item.data.id}`}
+          ref={isLast ? lastItemRef : null}
+          post={item.data}
+          currentUserId={currentUserId}
+          loggedInUser={loggedInUserProfile}
+          followingList={loggedInUserProfile?.following}
+          onLikeToggle={handleLikeToggle}
+          onNavigate={handleNavigateToPost}
+          onFollowToggle={handleFollowToggle}
+          onPrefetchProfile={handlePrefetchProfile}
+          onPrefetchPost={handlePrefetchPost}
+        />
       );
     }
-    if (count === 2) {
-      return (
-        <div className={`${gridBase} grid grid-cols-2 gap-0.5`}>
-          {post.imageUrls.map((url, index) => (
+
+    const data = item.data as
+      | ActivityItemGig["data"]
+      | ActivityItemRoom["data"];
+    const author = data.createdBy;
+    const title =
+      "title" in data
+        ? (data as ActivityItemGig["data"]).title
+        : (data as ActivityItemRoom["data"]).name;
+    const description = data.description;
+    const imageUrls =
+      "imageUrls" in data
+        ? (data as ActivityItemGig["data"]).imageUrls
+        : (data as ActivityItemRoom["data"]).imageUrl
+          ? [(data as ActivityItemRoom["data"]).imageUrl as string]
+          : [];
+    const navigationId = data.id;
+    const profileUrl = `/profile/${author.username}`;
+
+    const handleNavigation = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      handleNavigateToMapItem(item.type, navigationId);
+    };
+
+    const handleImageClick = (e: React.MouseEvent, index: number) => {
+      openModal(e, imageUrls, index);
+    };
+
+    const isGig = item.type === "gig";
+    const locationDisplay = "New Delhi, India";
+
+    return (
+      <div
+        key={`${item.type}-${navigationId}`}
+        ref={isLast ? lastItemRef : null}
+        onClick={handleNavigation}
+        className="flex space-x-3 p-4 border-b border-zinc-700 cursor-pointer hover:bg-zinc-900/50 transition-colors duration-200"
+      >
+        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <Link href={profileUrl}>
+            {author.image ? (
+              <Image
+                src={getImageUrl(author.image)}
+                alt={author.username}
+                width={40}
+                height={40}
+                className="rounded-full object-cover w-10 h-10"
+              />
+            ) : (
+              <div classNameName="bg-neutral-focus text-neutral-content rounded-full w-10 h-10 flex items-center justify-center">
+                {author.username[0].toUpperCase()}
+              </div>
+            )}
+          </Link>
+        </div>
+
+        <div className="flex-1 min-w-0 relative">
+          <div className="flex items-center justify-between mt-0.5">
             <div
-              key={index}
-              className="relative h-full cursor-pointer"
-              onClick={(e) => openModal(e, index)}
+              className="flex items-center gap-2 flex-wrap"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Link
+                href={profileUrl}
+                className="text-white font-bold hover:underline text-sm"
+                onMouseEnter={() => handlePrefetchProfile(author.username)}
+              >
+                {author.name || author.username}
+              </Link>
+              <Link
+                href={profileUrl}
+                className="text-zinc-400 hover:underline text-sm"
+                onMouseEnter={() => handlePrefetchProfile(author.username)}
+              >
+                @{author.username}
+              </Link>
+              <p className="text-zinc-500 text-sm">
+                · {new Date(data.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+            {locationDisplay && (
+              <div className="flex items-center gap-1 text-zinc-500 text-sm flex-shrink-0 ml-2 mt-1">
+                <MapPin size={14} />
+                <span>{locationDisplay}</span>
+              </div>
+            )}
+          </div>
+          
+          <p className="text-white mt-1 font-bold whitespace-pre-wrap break-words text-lg">
+            {title}
+          </p>
+
+          <div className="mt-3 p-3 bg-zinc-900/50 rounded-lg border border-zinc-700">
+            <p className="text-sm font-semibold text-zinc-400 mb-2">
+              {isGig ? "Gig Details:" : "Room Type:"}
+            </p>
+
+            {isGig ? (
+              <div className="space-y-1 text-sm text-zinc-300">
+                <div className="flex items-center gap-2">
+                  <DollarSign size={16} className="text-green-500" />
+                  <span className="font-medium">Reward:</span>
+                  <span>
+                    {(data as ActivityItemGig["data"]).reward ||
+                      "Not specified"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar size={16} className="text-white-400" />
+                  <span className="font-medium">Date:</span>
+                  <span>
+                    {new Date(
+                      (data as ActivityItemGig["data"]).date,
+                    ).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Tag size={16} className="text-purple-400" />
+                  <span className="font-medium">Type:</span>
+                  <span>
+                    {(data as ActivityItemGig["data"]).type || "General"}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1 text-sm text-zinc-300">
+                <div className="flex items-center gap-2">
+                  <Tag size={16} className="text-yellow-400" />
+                  <span className="font-medium">Type:</span>
+                  <span>
+                    {(data as ActivityItemRoom["data"]).type || "Public"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Info size={16} className="text-cyan-400" />
+                  <span className="font-medium">Creator:</span>
+                  <span>{author.name || author.username}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {description && <DescriptionExpander content={description} />}
+
+          {imageUrls.length > 0 && (
+            <div
+              className="relative w-full max-w-xl h-80 rounded-2xl overflow-hidden mt-3 border border-zinc-700 cursor-pointer"
+              onClick={(e) => handleImageClick(e, 0)}
             >
               <Image
-                src={`http://localhost:4000/uploads/${url}`}
-                alt={`Post image ${index + 1}`}
+                src={getImageUrl(imageUrls[0])}
+                alt={title}
                 fill
                 style={{ objectFit: "cover" }}
               />
             </div>
-          ))}
+          )}
+
+          <p className="text-sm font-medium text-zinc-500 mt-2">
+            Activity Type: {isGig ? "Gig" : "Room"}
+          </p>
         </div>
-      );
-    }
-  
-    if (count === 3) {
-      return (
-        <div className={`${gridBase} grid grid-cols-2 grid-rows-2 gap-0.5`}>
-          <div
-            className="relative row-span-2 cursor-pointer"
-            onClick={(e) => openModal(e, 0)}
-          >
-            <Image
-              src={`http://localhost:4000/uploads/${post.imageUrls[0]}`}
-              alt="Post image 1"
-              fill
-              style={{ objectFit: "cover" }}
-            />
-          </div>
-          <div
-            className="relative col-start-2 cursor-pointer"
-            onClick={(e) => openModal(e, 1)}
-          >
-            <Image
-              src={`http://localhost:4000/uploads/${post.imageUrls[1]}`}
-              alt="Post image 2"
-              fill
-              style={{ objectFit: "cover" }}
-            />
-          </div>
-          <div
-            className="relative col-start-2 row-start-2 cursor-pointer"
-            onClick={(e) => openModal(e, 2)}
-          >
-            <Image
-              src={`http://localhost:4000/uploads/${post.imageUrls[2]}`}
-              alt="Post image 3"
-              fill
-              style={{ objectFit: "cover" }}
-            />
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className={`${gridBase} grid grid-cols-2 grid-rows-2 gap-0.5`}>
-        {post.imageUrls.slice(0, 4).map((url, index) => (
-          <div
-            key={index}
-            className="relative h-full cursor-pointer"
-            onClick={(e) => openModal(e, index)}
-          >
-            <Image
-              src={`http://localhost:4000/uploads/${url}`}
-              alt={`Post image ${index + 1}`}
-              fill
-              style={{ objectFit: "cover" }}
-            />
-            {count > 4 && index === 3 && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-2xl font-bold">
-                +{count - 4}
-              </div>
-            )}
-          </div>
-        ))}
       </div>
     );
   };
 
   return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 15 }}
-      onClick={() => onNavigate(post.id)}
-      className="flex space-x-3 p-4 border-b border-gray-700 cursor-pointer hover:bg-gray-900/50 transition-colors duration-200"
-    >
-      {/* Avatar */}
-      <div className="flex-shrink-0" onClick={stopPropagation}>
-        {post.user?.image ? (
-          <Image
-            src={
-              post.user.image.startsWith("http")
-                ? post.user.image
-                : `http://localhost:4000/uploads/${post.user.image}`
-            }
-            alt={post.username}
-            width={40}
-            height={40}
-            className="rounded-full object-cover w-10 h-10"
-          />
-        ) : (
-          <div className="bg-neutral-focus text-neutral-content rounded-full w-10 h-10 flex items-center justify-center">
-            {post.username[0].toUpperCase()}
-          </div>
-        )}
+    <div className="w-full max-w-2xl mx-auto border-l border-r border-zinc-700 min-h-screen bg-black">
+      <div className="sticky top-0 bg-black/80 backdrop-blur-md z-20 border-b border-zinc-700">
+        <div className="flex justify-around bg-black border-b border-zinc-700">
+          <button
+            onClick={() => setFeedMode("global")}
+            className={`py-3 text-sm font-bold transition-colors w-full border-b-4 ${
+              feedMode === "global"
+                ? "text-white-500 border-white-500"
+                : "text-zinc-400 border-transparent hover:bg-zinc-900"
+            } cursor-pointer`}
+          >
+            For you
+          </button>
+          <button
+            onClick={() => setFeedMode("network")}
+            className={`py-3 text-sm font-bold transition-colors w-full border-b-4 ${
+              feedMode === "network"
+                ? "text-white-500 border-white-500"
+                : "text-zinc-400 border-transparent hover:bg-zinc-900"
+            } cursor-pointer`}
+          >
+            Following
+          </button>
+        </div>
       </div>
 
-      {/* Post Content */}
-      <div className="flex-1 min-w-0">
-        {/* Post Header */}
-        <div className="flex items-center justify-between">
-          <div
-            className="flex items-center gap-2 flex-wrap"
-            onClick={stopPropagation}
-          >
-            <p className="text-white font-bold hover:underline">
-              {post.name || post.username}
-            </p>
-            <p className="text-gray-400">@{post.username}</p>
-            <p className="text-gray-500 text-sm">
-              · {new Date(post.createdAt).toLocaleDateString()}
-            </p>
-          </div>
+      <CreatePost onPostCreated={onPostCreated} />
 
-          {post.location && (
-            <p className="text-gray-400 text-sm flex items-center gap-1 flex-shrink-0 ml-2">
-              <MapPin size={16} />
-              {post.location}
-            </p>
-          )}
-        </div>
+      <motion.div
+        key={feedMode}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <AnimatePresence>
+          {feedItems.map((item, idx) => renderActivityItem(item, idx))}
+        </AnimatePresence>
+      </motion.div>
 
-        {/* Post Body */}
-        <p
-          ref={contentRef}
-          className={`text-white mt-1 whitespace-pre-wrap break-words ${
-            !isExpanded ? "line-clamp-8" : ""
-          }`}
+      {(isLoading || isFetchingNextPage) && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-black flex items-center justify-center m-10"
         >
-          {post.content}
+          <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
+        </motion.div>
+      )}
+
+      {!isLoading && !hasNextPage && feedItems.length > 0 && (
+        <p className="text-zinc-500 text-center p-4">You've reached the end</p>
+      )}
+
+      {!isLoading && !isFetchingNextPage && feedItems.length === 0 && (
+        <p className="text-zinc-500 text-center p-10">
+          No activity matches your current filters or mode.
         </p>
+      )}
 
-        {(needsTruncation || isExpanded) && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsExpanded((prev) => !prev);
-            }}
-            className="text-blue-500 hover:underline mt-2 text-sm font-medium"
-          >
-            {isExpanded ? "Show less" : "Show more"}
-          </button>
-        )}
-
-        {/* Post Image Grid */}
-        {renderImageGrid()}
-
-        {/* LIKE & COMMENT ACTION BAR */}
-        <div className="flex items-center gap-6 mt-4 text-gray-500">
-          {/* Like Button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onLikeToggle(post.id);
-            }}
-            // Disable if not logged in
-            disabled={!currentUserId}
-            className={`flex items-center gap-1.5 transition-colors duration-200 group ${
-              isLikedByCurrentUser ? "text-red-500" : "hover:text-red-500"
-            } ${!currentUserId ? "opacity-50" : ""}`}
-          >
-            <Heart
-              size={18}
-              fill={isLikedByCurrentUser ? "currentColor" : "none"}
-              className="group-hover:scale-110 transition-transform"
-            />
-            <span className="text-sm">{post._count.likes}</span>
-          </button>
-
-          {/* Comment Button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onNavigate(post.id); 
-            }}
-            className="flex items-center gap-1.5 hover:text-blue-500 transition-colors duration-200 group"
-          >
-            <MessageCircle
-              size={18}
-              className="group-hover:scale-110 transition-transform"
-            />
-            <span className="text-sm">{post._count.comments}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Image Modal (Unchanged) */}
-      {isModalOpen && (
+      {isModalOpen && modalImages.length > 0 && (
         <div
           className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
           onClick={closeModal}
@@ -343,7 +733,7 @@ const PostEntry = React.forwardRef<
           >
             <X size={32} />
           </button>
-          {post.imageUrls.length > 1 && (
+          {modalImages.length > 1 && (
             <button
               className="absolute left-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
               onClick={showPrevImage}
@@ -353,13 +743,16 @@ const PostEntry = React.forwardRef<
           )}
           <div className="relative w-[90vw] h-[90vh]" onClick={stopPropagation}>
             <Image
-              src={`http://localhost:4000/uploads/${post.imageUrls[modalImageIndex]}`}
-              alt="Post image expanded"
+              src={getImageUrl(modalImages[modalImageIndex])}
+              alt="Expanded image"
               fill
               style={{ objectFit: "contain" }}
             />
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white bg-black/50 px-3 py-1 rounded-full text-sm">
+              {modalImageIndex + 1} / {modalImages.length}
+            </div>
           </div>
-          {post.imageUrls.length > 1 && (
+          {modalImages.length > 1 && (
             <button
               className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
               onClick={showNextImage}
@@ -369,189 +762,49 @@ const PostEntry = React.forwardRef<
           )}
         </div>
       )}
-    </motion.div>
-  );
-});
-PostEntry.displayName = "PostEntry";
 
-
-export default function Feedbox() {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
-  const observer = useRef<IntersectionObserver | null>(null);
-
- 
-  const [user] = useAtom(userAtom);
-  const currentUserId = user?.id; 
-  const router = useRouter();
-
-  const lastPostRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (loading) return;
-      if (observer.current) observer.current.disconnect();
-
-      observer.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasMore) {
-          setPage((prev) => prev + 1);
-        }
-      });
-
-      if (node) observer.current.observe(node);
-    },
-    [loading, hasMore],
-  );
-
-  useEffect(() => {
-    if (!hasMore) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    const fetchPosts = async () => {
-      try {
-        const res = await fetch(
-          `http://localhost:4000/posts?skip=${page * 5}&take=5`,
-        );
-        if (!res.ok) throw new Error("Failed to fetch");
-        const data: Post[] = await res.json();
-
-        if (data.length === 0) {
-          setHasMore(false);
-        } else {
-          setPosts((prev) => {
-            const existingIds = new Set(prev.map((p) => p.id));
-            const newPosts = data.filter((p) => !existingIds.has(p.id));
-            return [...prev, ...newPosts];
-          });
-        }
-        if (data.length < 5) setHasMore(false);
-      } catch (err) {
-        console.error("Failed to fetch posts:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPosts();
-  }, [page, hasMore]);
-
-  // --- 3. UPDATED LIKE FUNCTION ---
-  const handleLikeToggle = async (postId: number) => {
-    
-    if (!currentUserId) {
-      console.error("User not found, cannot like post");
-      return;
-    }
-
-    
-    setPosts((prevPosts) =>
-      prevPosts.map((post) => {
-        if (post.id === postId) {
-          const isLiked = post.likes.some(
-            (like) => like.userId === currentUserId,
-          );
-          if (isLiked) {
-           
-            return {
-              ...post,
-              likes: post.likes.filter((like) => like.userId !== currentUserId),
-              _count: { ...post._count, likes: post._count.likes - 1 },
-            };
-          } else {
-        
-            return {
-              ...post,
-              likes: [...post.likes, { userId: currentUserId }],
-              _count: { ...post._count, likes: post._count.likes + 1 },
-            };
-          }
-        }
-        return post;
-      }),
-    );
-
-  
-    try {
-      await fetch(`http://localhost:4000/posts/${postId}/like`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: currentUserId }), 
-      });
-    } catch (err) {
-      console.error("Failed to toggle like:", err);
-     
-    }
-  };
-
-  const handleNavigateToPost = (postId: number) => {
-    router.push(`/post/${postId}`);
-  };
-
-  const onPostCreated = async (newPost: Post) => {
-    try {
-   
-    
-    
-      const res = await fetch(`http://localhost:4000/posts/${newPost.id}`);
-      if (!res.ok) throw new Error("Failed to fetch new post details");
-
-      const fullPost: Post = await res.json();
-
-    
-      setPosts((prevPosts) => [fullPost, ...prevPosts]);
-    } catch (err) {
-      console.error(err);
-    
-      setPosts((prevPosts) => [newPost, ...prevPosts]);
-    }
-  };
-  return (
-    <div className="w-full max-w-2xl mx-auto border-l border-r border-gray-700 min-h-screen bg-black">
-      {/* Sticky Header */}
-      <div className="sticky top-0 bg-black/80 backdrop-blur-md z-10">
-        <h1 className="text-xl font-bold text-white p-4 border-b border-gray-700">
-          Home
-        </h1>
-      </div>
-
-      {/* 4. Pass user to CreatePost */}
-      <CreatePost onPostCreated={onPostCreated} />
-
-      {/* Feed */}
-      <AnimatePresence>
-        {posts.map((post, idx) => {
-          const isLast = idx === posts.length - 1;
-          return (
-            <PostEntry
-              key={`${post.id}-${idx}`}
-              ref={isLast ? lastPostRef : null}
-              post={post}
-              // 5. Pass down the correct ID
-              currentUserId={currentUserId}
-              onLikeToggle={handleLikeToggle}
-              onNavigate={handleNavigateToPost}
-            />
-          );
-        })}
-      </AnimatePresence>
-
-      {loading && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-black flex items-center justify-center m-10"
+      <div
+        className="fixed bottom-5 z-50"
+        ref={filterMenuRef}
+        style={{ right: `max(1.25rem, calc((100vw - 672px) / 2))` }}
+        onClick={() => setIsFilterOpen(true)}
+      >
+        <button
+          onClick={() => setIsFilterOpen(!isFilterOpen)}
+          className="flex items-center space-x-1 p-3 rounded-full text-white bg-black-600 hover:bg-zinc-900 transition-colors shadow shadow-white cursor-pointer"
         >
-          {/* Use Loader2 for consistency */}
-          <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
-        </motion.div>
-      )}
+          <Filter size={22} />
+        </button>
 
-      {!loading && !hasMore && (
-        <p className="text-gray-500 text-center p-4">You've reached the end</p>
-      )}
+        <AnimatePresence>
+          {isFilterOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute bottom-full right-0 mb-4 w-48 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl z-50 p-4"
+            >
+              <div className="flex flex-col space-y-3">
+                <FilterToggle
+                  label="Posts"
+                  checked={filters.posts}
+                  onChange={() => handleFilterChange("posts")}
+                />
+                <FilterToggle
+                  label="Gigs"
+                  checked={filters.gigs}
+                  onChange={() => handleFilterChange("gigs")}
+                />
+                <FilterToggle
+                  label="Rooms"
+                  checked={filters.rooms}
+                  onChange={() => handleFilterChange("rooms")}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

@@ -5,8 +5,6 @@ import type { Router as ExpressRouter } from "express";
 
 const router: ExpressRouter = Router();
 
-// --- Create or find user ---
-// (No changes needed here)
 router.post("/", async (req, res) => {
   const { name, email, image } = req.body;
 
@@ -38,7 +36,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// --- Get user profile ---
 router.get("/profile/:username", async (req, res) => {
   const { username } = req.params;
 
@@ -46,17 +43,14 @@ router.get("/profile/:username", async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { username },
       include: {
-      
         posts: {
           orderBy: { createdAt: "desc" },
           include: {
-           
             likes: {
               select: {
                 userId: true,
               },
             },
-           
             _count: {
               select: {
                 likes: true,
@@ -100,7 +94,6 @@ router.get("/profile/:username", async (req, res) => {
             type: true,
           },
         },
-        // --- ADDED FOR NEW SCHEMA ---
         followers: {
           select: {
             id: true,
@@ -117,7 +110,6 @@ router.get("/profile/:username", async (req, res) => {
             image: true,
           },
         },
-        // --- END OF ADDED ---
       },
     });
 
@@ -130,10 +122,8 @@ router.get("/profile/:username", async (req, res) => {
   }
 });
 
-// --- Update user profile ---
 router.patch(
   "/profile/:username",
-
   upload.fields([
     { name: "image", maxCount: 1 },
     { name: "posterImage", maxCount: 1 },
@@ -193,6 +183,19 @@ router.patch(
         include: {
           posts: {
             orderBy: { createdAt: "desc" },
+            include: {
+              likes: {
+                select: {
+                  userId: true,
+                },
+              },
+              _count: {
+                select: {
+                  likes: true,
+                  comments: true,
+                },
+              },
+            },
           },
           rooms: {
             select: {
@@ -229,7 +232,6 @@ router.patch(
               type: true,
             },
           },
-          // --- ADDED FOR NEW SCHEMA ---
           followers: {
             select: {
               id: true,
@@ -246,7 +248,6 @@ router.patch(
               image: true,
             },
           },
-          // --- END OF ADDED ---
         },
       });
 
@@ -258,5 +259,131 @@ router.patch(
     }
   },
 );
+
+router.post("/follow", async (req, res) => {
+  const { currentUserId, targetUsername } = req.body;
+
+  if (!currentUserId || !targetUsername) {
+    return res
+      .status(400)
+      .json({ message: "currentUserId and targetUsername are required" });
+  }
+
+  try {
+    const targetUser = await prisma.user.findUnique({
+      where: { username: targetUsername },
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ message: "Target user not found" });
+    }
+
+    const isFollowing = await prisma.user.count({
+      where: {
+        id: currentUserId,
+        following: {
+          some: {
+            id: targetUser.id,
+          },
+        },
+      },
+    });
+
+    let actionMessage: string;
+
+    if (isFollowing > 0) {
+      await prisma.user.update({
+        where: { id: currentUserId },
+        data: {
+          following: {
+            disconnect: { id: targetUser.id },
+          },
+        },
+      });
+      actionMessage = "User unfollowed successfully";
+    } else {
+      await prisma.user.update({
+        where: { id: currentUserId },
+        data: {
+          following: {
+            connect: { id: targetUser.id },
+          },
+        },
+      });
+      actionMessage = "User followed successfully";
+    }
+
+    const updatedTargetProfile = await prisma.user.findUnique({
+      where: { username: targetUsername },
+      include: {
+        posts: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            likes: {
+              select: {
+                userId: true,
+              },
+            },
+            _count: {
+              select: {
+                likes: true,
+                comments: true,
+              },
+            },
+          },
+        },
+        rooms: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            imageUrl: true,
+            latitude: true,
+            longitude: true,
+            type: true,
+          },
+        },
+        mapRooms: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            imageUrl: true,
+            latitude: true,
+            longitude: true,
+            type: true,
+          },
+        },
+        gigs: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            latitude: true,
+            longitude: true,
+            date: true,
+            imageUrls: true,
+            type: true,
+          },
+        },
+        followers: {
+          select: { id: true, username: true, name: true, image: true },
+        },
+        following: {
+          select: { id: true, username: true, name: true, image: true },
+        },
+      },
+    });
+
+    res.status(200).json({
+      message: actionMessage,
+      profile: updatedTargetProfile,
+    });
+  } catch (err) {
+    console.error("Error toggling follow:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 
 export default router;
