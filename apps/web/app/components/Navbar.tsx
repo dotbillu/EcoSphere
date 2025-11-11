@@ -11,9 +11,12 @@ import { useAtom } from "jotai";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { API_BASE_URL } from "@/lib/constants";
 
+// CHANGED: Removed hardcoded API URL from the fetchProfile definition
 const fetchProfile = async (username: string): Promise<UserProfile> => {
-  const res = await fetch(`http://127.0.0.1:4000/user/profile/${username}`);
+  // CHANGED: Use constant API_BASE_URL
+  const res = await fetch(`${API_BASE_URL}/user/profile/${username}`);
   if (!res.ok) throw new Error("Failed to fetch profile");
   return res.json();
 };
@@ -44,7 +47,8 @@ export default function Navbar() {
       queryFn: () => fetchProfile(loggedInUser.username),
       staleTime: 60_000,
     });
-    fetch(`http://127.0.0.1:4000/user/profile/${loggedInUser.username}`).catch(
+    // CHANGED: Use constant API_BASE_URL
+    fetch(`${API_BASE_URL}/user/profile/${loggedInUser.username}`).catch(
       () => {}
     );
   }, [loggedInUser, queryClient, router]);

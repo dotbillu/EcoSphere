@@ -5,16 +5,14 @@ import { UserProfile } from "@/store";
 import { X, Camera } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { API_BASE_URL } from "@/lib/constants";
+import { API_BASE_URL } from "@lib/constants";
 
-// Helper to get image URLs (same as profile page)
 const getImageUrl = (path: string | null | undefined) => {
   if (!path) return "";
   if (path.startsWith("http")) return path;
   return `${API_BASE_URL}/uploads/${path}`;
 };
 
-// --- Reusable Sub-Component 1: Image Upload Field ---
 interface ImageUploadFieldProps {
   previewUrl: string;
   onTriggerClick: () => void;
@@ -53,7 +51,6 @@ function ImageUploadField({
   );
 }
 
-// --- Reusable Sub-Component 2: Hidden File Input ---
 interface HiddenFileInputProps {
   inputRef: React.RefObject<HTMLInputElement>;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -71,7 +68,6 @@ function HiddenFileInput({ inputRef, onChange }: HiddenFileInputProps) {
   );
 }
 
-// --- Main Modal Component ---
 interface EditProfileModalProps {
   profile: UserProfile;
   onClose: () => void;
@@ -87,7 +83,6 @@ export default function EditProfileModal({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // --- Refactored State ---
   const [files, setFiles] = useState<{
     image: File | null;
     poster: File | null;
@@ -101,13 +96,11 @@ export default function EditProfileModal({
     poster: getImageUrl(profile.posterImage),
   });
 
-  // --- Refactored Refs ---
   const inputRefs = {
     image: useRef<HTMLInputElement>(null),
     poster: useRef<HTMLInputElement>(null),
   };
 
-  // --- Refactored File Handler ---
   const handleFileChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     type: "image" | "poster"
@@ -128,7 +121,6 @@ export default function EditProfileModal({
     const formData = new FormData();
     formData.append("name", name);
 
-    // --- Refactored FormData Appending ---
     if (files.image) {
       formData.append("image", files.image);
     }
@@ -171,7 +163,6 @@ export default function EditProfileModal({
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-lg rounded-2xl bg-black border border-zinc-700 text-white"
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-zinc-700">
           <div className="flex items-center gap-4">
             <button
@@ -191,9 +182,7 @@ export default function EditProfileModal({
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit}>
-          {/* --- Using Reusable Components --- */}
           <ImageUploadField
             previewUrl={previews.poster}
             onTriggerClick={() => inputRefs.poster.current?.click()}
@@ -221,7 +210,6 @@ export default function EditProfileModal({
             onChange={(e) => handleFileChange(e, "poster")}
           />
 
-          {/* Name Input */}
           <div className="p-4 pt-0 space-y-2">
             <label htmlFor="name" className="text-sm text-zinc-400">
               Name

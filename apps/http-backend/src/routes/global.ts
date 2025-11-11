@@ -1,20 +1,25 @@
 import { Router } from "express";
-import { prisma } from "../lib/prisma";
+import { prisma } from "@lib/prisma";
 import type { Router as ExpressRouter } from "express";
 
 const router: ExpressRouter = Router();
 
 // --- Global Activity Feed Endpoint ---
 router.get("/feed", async (req, res) => {
-  const { skip, take, posts: filterPosts, gigs: filterGigs, rooms: filterRooms } = req.query;
+  const {
+    skip,
+    take,
+    posts: filterPosts,
+    gigs: filterGigs,
+    rooms: filterRooms,
+  } = req.query;
 
   try {
     const skipNum = parseInt(skip as string) || 0;
     const takeNum = parseInt(take as string) || 10;
-    
+
     let allItems: any[] = [];
-    
-    // 1. Posts Fetch (Includes relations needed for PostEntry)
+
     if (filterPosts === "true") {
       const posts = await prisma.post.findMany({
         orderBy: { createdAt: "desc" },
@@ -35,7 +40,7 @@ router.get("/feed", async (req, res) => {
         }),
       );
     }
-    
+
     // 2. Gigs Fetch
     if (filterGigs === "true") {
       const gigs = await prisma.gig.findMany({
@@ -62,7 +67,7 @@ router.get("/feed", async (req, res) => {
         }),
       );
     }
-    
+
     // 3. Rooms Fetch
     if (filterRooms === "true") {
       const rooms = await prisma.mapRoom.findMany({
@@ -88,7 +93,6 @@ router.get("/feed", async (req, res) => {
       );
     }
 
-    // Sort the combined list by date
     allItems.sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
 
     // Apply pagination to the *final* sorted list

@@ -8,24 +8,22 @@ import { userAtom } from '@/store';
 
 const MESSAGES_PER_PAGE = 30;
 
-// This is the function that fetches the data
 const fetchMessages = async ({ pageParam = 0, queryKey }: any) => {
   const [_key, conversation] = queryKey;
-  // Use the 'id' from the queryKey, not the full 'data' object
   const { type, id, currentUserId } = conversation;
 
   let url = "";
   if (type === "room") {
-    url = `${API_BASE_URL}/chat/room/${id}/messages?skip=${pageParam}&take=${MESSAGES_PER_PAGE}`;
+    // FIX: Remove the redundant '/room' prefix to match the backend routing structure
+    url = `${API_BASE_URL}/chat/${id}/messages?skip=${pageParam}&take=${MESSAGES_PER_PAGE}`;
   } else {
     url = `${API_BASE_URL}/chat/dm/${id}?currentUserId=${currentUserId}&skip=${pageParam}&take=${MESSAGES_PER_PAGE}`;
   }
 
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch messages");
-  
+
   const messages: MessageType[] = await res.json();
-  // Return the messages as-is (newest first)
   return messages;
 };
 
@@ -46,14 +44,8 @@ export const useChatMessages = (conversation: SelectedConversation) => {
       return allPages.flat().length;
     },
     enabled: !!conversation && !!currentUser,
-    staleTime: 1000 * 60 * 5, 
-    
-    // --- THIS IS THE FIX ---
-    // 1. data.pages is [ [page1_newest], [page2_older], [page3_oldest] ]
-    // 2. .flat() makes it [ ...page1_newest, ...page2_older, ...page3_oldest ]
-    // 3. .reverse() makes it [ ...page3_oldest, ...page2_older, ...page1_newest ]
-    // This gives us the correct chronological order for the chat.
-    select: (data) => data.pages.flat().reverse(), 
-    // --- END FIX ---
+    staleTime: 1000 * 60 * 5,
+
+    select: (data) => data.pages.flat().reverse(),
   });
 };

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAtom } from "jotai";
-import { userAtom } from "../../../store";
+import { userAtom } from "@/store";
 import { GigElement } from "./MapTypes";
 import { X, Loader2, Upload } from "lucide-react";
 import { API_BASE_URL } from "@/lib/constants";
@@ -52,7 +52,7 @@ export default function CreateGigModal({
     formData.append("description", description);
     formData.append("latitude", location.lat.toString());
     formData.append("longitude", location.lng.toString());
-    formData.append("creatorId", user.id.toString());
+    formData.append("creatorId", user.id);
     formData.append("type", type);
     formData.append("reward", reward);
     formData.append("date", new Date(date).toISOString());

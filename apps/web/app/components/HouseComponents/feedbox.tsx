@@ -99,7 +99,7 @@ const fetchNetworkActivity = async ({
   filters,
 }: {
   pageParam: number;
-  currentUserId: number;
+  currentUserId: string;
   filters: FilterState;
 }): Promise<FeedPage> => {
   if (!currentUserId) return { items: [], hasNextPage: false };
@@ -111,7 +111,7 @@ const fetchNetworkActivity = async ({
   return res.json();
 };
 
-const fetchPost = async (postId: number): Promise<Post> => {
+const fetchPost = async (postId: string): Promise<Post> => {
   const res = await fetch(`${API_BASE_URL}/posts/${postId}`);
   if (!res.ok) throw new Error("Failed to fetch post");
   return res.json();
@@ -127,8 +127,8 @@ const toggleLike = async ({
   postId,
   currentUserId,
 }: {
-  postId: number;
-  currentUserId: number;
+  postId: string;
+  currentUserId: string;
 }) => {
   const res = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
     method: "POST",
@@ -143,7 +143,7 @@ const toggleFollow = async ({
   currentUserId,
   targetUsername,
 }: {
-  currentUserId: number;
+  currentUserId: string;
   targetUsername: string;
 }) => {
   const res = await fetch(`${API_BASE_URL}/user/follow`, {
@@ -232,9 +232,7 @@ export default function Feedbox() {
     rooms: true,
   });
 
-  // [NEW] Ref to hold the like debounce timer, mimicking Profile.tsx
   const likeDebounceTimer = useRef<NodeJS.Timeout | null>(null);
-  // [REMOVED] const [pendingLikeToggle, setPendingLikeToggle] = useState<...>(null);
 
   const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
 
@@ -325,21 +323,14 @@ export default function Feedbox() {
   const likeMutation = useMutation({
     mutationFn: toggleLike,
     onMutate: async ({ postId, currentUserId }) => {
-      // Note: The optimistic update is now primarily in handleLikeToggle,
-      // but we cancel and return previous data here for rollback.
       await queryClient.cancelQueries({ queryKey: ["activity"] });
-      
+
       const queryKey = ["activity", feedMode, currentUserId, filters];
       const previousActivity = queryClient.getQueryData(queryKey);
 
-      // We skip the complex optimistic setQueryData here because it's already done
-      // in the handler (handleLikeToggle) for immediate visual feedback.
-      // This onMutate is primarily for saving rollback data.
-      
       return { previousActivity, queryKey };
     },
     onError: (err, variables, context: any) => {
-      // Rollback to previous state
       if (context?.previousActivity) {
         queryClient.setQueryData(
           context.queryKey,
@@ -349,7 +340,6 @@ export default function Feedbox() {
       console.error("Like toggle failed:", err);
     },
     onSettled: () => {
-      // Ensure data is eventually consistent, regardless of success/failure
       queryClient.invalidateQueries({ queryKey: ["activity"] });
     },
   });
@@ -362,15 +352,13 @@ export default function Feedbox() {
     },
   });
 
-  // [UPDATED] Like Handler uses optimistic update and debounced mutation (mimicking Profile.tsx)
-  const handleLikeToggle = (postId: number) => {
+  const handleLikeToggle = (postId: string) => {
     if (!currentUserId) return;
     const queryKey = ["activity", feedMode, currentUserId, filters];
 
-    // 1. Optimistic Update (immediate UI change)
     queryClient.setQueryData<any>(queryKey, (oldData) => {
       if (!oldData) return;
-      
+
       return {
         ...oldData,
         pages: oldData.pages.map((page: FeedPage) => ({
@@ -379,11 +367,10 @@ export default function Feedbox() {
             if (item.type === "post" && item.data.id === postId) {
               const post = item.data as Post;
               const isLiked = post.likes.some((like: any) => like.userId === currentUserId);
-              
+
               const optimisticLikeEntry = { userId: currentUserId, postId: postId };
 
               if (isLiked) {
-                // Optimistically unlike
                 return {
                   ...item,
                   data: {
@@ -393,7 +380,6 @@ export default function Feedbox() {
                   },
                 };
               } else {
-                // Optimistically like
                 return {
                   ...item,
                   data: {
@@ -410,27 +396,23 @@ export default function Feedbox() {
       };
     });
 
-    // 2. Clear any pending network request
     if (likeDebounceTimer.current) {
       clearTimeout(likeDebounceTimer.current);
     }
 
-    // 3. Set a new timer to send the actual request via mutation
     likeDebounceTimer.current = setTimeout(() => {
       likeMutation.mutate({
         postId: postId,
         currentUserId: currentUserId,
       });
-    }, 1000); // 1-second debounce delay
+    }, 1000);
   };
-
-  // [REMOVED] The old useEffect for debouncing is removed as the logic is in handleLikeToggle
 
   const handleFollowToggle = (targetUsername: string) => {
     if (!currentUserId) return;
     followMutation.mutate({ currentUserId, targetUsername });
   };
-  const handleNavigateToPost = (postId: number) => {
+  const handleNavigateToPost = (postId: string) => {
     queryClient.prefetchQuery({
       queryKey: ["post", postId],
       queryFn: () => fetchPost(postId),
@@ -450,7 +432,7 @@ export default function Feedbox() {
     [queryClient],
   );
   const handlePrefetchPost = useCallback(
-    (postId: number) => {
+    (postId: string) => {
       queryClient.prefetchQuery({
         queryKey: ["post", postId],
         queryFn: () => fetchPost(postId),
@@ -459,7 +441,7 @@ export default function Feedbox() {
     [queryClient],
   );
 
-  const handleNavigateToMapItem = (type: "gig" | "room", id: number) => {
+  const handleNavigateToMapItem = (type: "gig" | "room", id: string) => {
     router.push(`/map?${type}Id=${id}`);
   };
 
@@ -546,7 +528,7 @@ export default function Feedbox() {
                 className="rounded-full object-cover w-10 h-10"
               />
             ) : (
-              <div classNameName="bg-neutral-focus text-neutral-content rounded-full w-10 h-10 flex items-center justify-center">
+              <div className="bg-neutral-focus text-neutral-content rounded-full w-10 h-10 flex items-center justify-center">
                 {author.username[0].toUpperCase()}
               </div>
             )}
@@ -584,7 +566,7 @@ export default function Feedbox() {
               </div>
             )}
           </div>
-          
+
           <p className="text-white mt-1 font-bold whitespace-pre-wrap break-words text-lg">
             {title}
           </p>

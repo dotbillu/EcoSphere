@@ -2,7 +2,22 @@
   "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@chats": [
+        "./src/routes/chats/index.ts"
+      ],
+      "@lib/*": [
+        "./src/lib/*"
+      ],
+      "@maps": [
+        "./src/routes/maps/index"
+      ],
+      "@multer":[
+        "./src/multer"
+      ]
+    }
   },
   "include": [
     "src"

@@ -13,17 +13,16 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getImageUrl } from "../../lib/utils"; 
-import { Post } from "../../store"; 
+import { getImageUrl } from "../../lib/utils";
+import { Post } from "../../store";
 
-// --- (NEW) Define the props here ---
 interface PostEntryProps {
   post: Post;
-  currentUserId?: number;
-  onLikeToggle: (postId: number) => void;
-  onNavigate: (postId: number) => void;
+  currentUserId?: string;
+  onLikeToggle: (postId: string) => void;
+  onNavigate: (postId: string) => void;
   onPrefetchProfile: (username: string) => void;
-  onPrefetchPost: (postId: number) => void;
+  onPrefetchPost: (postId: string) => void;
 }
 
 const PostEntry = React.forwardRef<
@@ -61,7 +60,7 @@ const PostEntry = React.forwardRef<
     }, [post.content, isExpanded]);
 
     const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
-    
+
     const openModal = (e: React.MouseEvent, index: number) => {
       e.stopPropagation();
       setModalImageIndex(index);
@@ -84,8 +83,6 @@ const PostEntry = React.forwardRef<
       );
     };
 
-    // This component uses the global getImageUrl function
-    
     const renderImageGrid = () => {
       const count = post.imageUrls.length;
       if (count === 0) return null;
@@ -205,7 +202,6 @@ const PostEntry = React.forwardRef<
         }}
         className="flex space-x-3 p-4 border-b border-zinc-700 cursor-pointer hover:bg-zinc-900/50 transition-colors duration-200"
       >
-        {/* Avatar */}
         <div className="flex-shrink-0" onClick={stopPropagation}>
           <Link href={`/profile/${post.username}`}>
             {post.user?.image ? (
@@ -224,9 +220,7 @@ const PostEntry = React.forwardRef<
           </Link>
         </div>
 
-        {/* Post Content */}
         <div className="flex-1 min-w-0">
-          {/* Post Header */}
           <div className="flex items-center justify-between">
             <div
               className="flex items-center gap-2 flex-wrap"
@@ -265,7 +259,6 @@ const PostEntry = React.forwardRef<
             )}
           </div>
 
-          {/* Post Body */}
           <p
             ref={contentRef}
             className={`text-white mt-1 whitespace-pre-wrap break-words ${
@@ -283,16 +276,14 @@ const PostEntry = React.forwardRef<
               }}
               className="text-blue-500 hover:underline mt-2 text-sm font-medium"
             >
+      
               {isExpanded ? "Show less" : "Show more"}
             </button>
           )}
 
-          {/* Post Image Grid */}
           {renderImageGrid()}
 
-          {/* LIKE & COMMENT ACTION BAR */}
           <div className="flex items-center gap-6 mt-4 text-zinc-500">
-            {/* Like Button */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -311,7 +302,6 @@ const PostEntry = React.forwardRef<
               <span className="text-sm">{post._count.likes}</span>
             </button>
 
-            {/* Comment Button */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -332,7 +322,6 @@ const PostEntry = React.forwardRef<
           </div>
         </div>
 
-        {/* Image Modal */}
         {isModalOpen && (
           <div
             className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"

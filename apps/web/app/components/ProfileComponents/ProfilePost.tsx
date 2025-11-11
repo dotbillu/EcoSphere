@@ -23,9 +23,9 @@ export default function ProfilePost({
 }: {
   post: Post;
   userImageUrl?: string | null;
-  currentUserId?: number;
-  onLikeToggle: (postId: number) => void;
-  onNavigate: (postId: number) => void;
+  currentUserId?: string; // CHANGED: type is now string (UUID)
+  onLikeToggle: (postId: string) => void; // CHANGED: postId is now string
+  onNavigate: (postId: string) => void; // CHANGED: postId is now string
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [needsTruncation, setNeedsTruncation] = useState(false);
@@ -33,6 +33,7 @@ export default function ProfilePost({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalImageIndex, setModalImageIndex] = useState(0);
 
+  // CHANGED: Compare string UUIDs
   const isLikedByCurrentUser = post.likes.some(
     (like) => like.userId === currentUserId,
   );
@@ -224,7 +225,7 @@ export default function ProfilePost({
           <Heart
             size={18}
             fill={isLikedByCurrentUser ? "currentColor" : "none"}
-            className="group-hover:scale-110 transition-transform  cursor-pointer"
+            className="group-hover:scale-110 transition-transform cursor-pointer"
           />
           <span className="text-sm">{post._count.likes}</span>
         </button>
@@ -281,4 +282,3 @@ export default function ProfilePost({
     </motion.div>
   );
 }
-

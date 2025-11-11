@@ -8,7 +8,7 @@ generator client {
 }
 
 model User {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(uuid())
   name        String
   username    String   @unique
   email       String   @unique
@@ -16,14 +16,14 @@ model User {
   posterImage String?
   createdAt   DateTime @default(now())
 
-  posts     Post[]   @relation("UserPosts")
-  rooms     MapRoom[] @relation("UserRooms")
-  mapRooms  MapRoom[] @relation("MapRoomCreator")
-  gigs      Gig[]    @relation("GigCreator")
-  followers User[]   @relation("UserFollows")
-  following User[]   @relation("UserFollows")
-  likes     Like[]   @relation("UserLikes")
-  comments  Comment[] @relation("UserComments")
+  posts       Post[]    @relation("UserPosts")
+  rooms       MapRoom[] @relation("UserRooms")
+  mapRooms    MapRoom[] @relation("MapRoomCreator")
+  gigs        Gig[]     @relation("GigCreator")
+  followers   User[]    @relation("UserFollows")
+  following   User[]    @relation("UserFollows")
+  likes       Like[]    @relation("UserLikes")
+  comments    Comment[] @relation("UserComments")
 
   groupMessages GroupMessage[]  @relation("UserGroupMessages")
   sentDMs       DirectMessage[] @relation("SentDMs")
@@ -32,7 +32,7 @@ model User {
 }
 
 model Post {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   username  String
   name      String
   content   String
@@ -42,19 +42,19 @@ model Post {
 
   user   User     @relation("UserPosts", fields: [username], references: [username])
   room   MapRoom? @relation("RoomPosts", fields: [roomId], references: [id])
-  roomId Int?
+  roomId String?
 
   likes    Like[]    @relation("PostLikes")
   comments Comment[] @relation("PostComments")
 }
 
 model Like {
-  id     Int  @id @default(autoincrement())
-  post   Post @relation("PostLikes", fields: [postId], references: [id], onDelete: Cascade)
-  postId Int
+  id   String @id @default(uuid())
+  post Post   @relation("PostLikes", fields: [postId], references: [id], onDelete: Cascade)
+  postId String
 
-  user   User @relation("UserLikes", fields: [userId], references: [id], onDelete: Cascade)
-  userId Int
+  user   User   @relation("UserLikes", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 
   createdAt DateTime @default(now())
 
@@ -62,39 +62,39 @@ model Like {
 }
 
 model Comment {
-  id      Int    @id @default(autoincrement())
+  id      String @id @default(uuid())
   content String
   post    Post   @relation("PostComments", fields: [postId], references: [id], onDelete: Cascade)
-  postId  Int
+  postId  String
 
-  user   User @relation("UserComments", fields: [userId], references: [id], onDelete: Cascade)
-  userId Int
+  user   User   @relation("UserComments", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 
   createdAt DateTime @default(now())
 }
 
 model MapRoom {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(uuid())
   name        String
   description String?
   latitude    Float
   longitude   Float
   createdAt   DateTime @default(now())
 
-  createdBy User @relation("MapRoomCreator", fields: [creatorId], references: [id])
-  creatorId Int
+  createdBy User   @relation("MapRoomCreator", fields: [creatorId], references: [id])
+  creatorId String
 
-  members  User[] @relation("UserRooms")
-  posts    Post[] @relation("RoomPosts")
+  members  User[]   @relation("UserRooms")
+  posts    Post[]   @relation("RoomPosts")
   type     String?
   imageUrl String?
-  gigs     Gig[]  @relation("RoomGigs")
+  gigs     Gig[]    @relation("RoomGigs")
 
   groupMessages GroupMessage[] @relation("RoomGroupMessages")
 }
 
 model Gig {
-  id          Int       @id @default(autoincrement())
+  id          String    @id @default(uuid())
   title       String
   description String?
   latitude    Float
@@ -104,26 +104,26 @@ model Gig {
   expiresAt   DateTime?
   createdAt   DateTime  @default(now())
 
-  createdBy User @relation("GigCreator", fields: [creatorId], references: [id])
-  creatorId Int
+  createdBy User   @relation("GigCreator", fields: [creatorId], references: [id])
+  creatorId String
 
   room   MapRoom? @relation("RoomGigs", fields: [roomId], references: [id])
-  roomId Int?
+  roomId String?
 
   type      String?
   imageUrls String[] @default([])
 }
 
 model GroupMessage {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   content   String
   createdAt DateTime @default(now())
 
   sender   User   @relation("UserGroupMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  senderId Int
+  senderId String
 
   room   MapRoom @relation("RoomGroupMessages", fields: [roomId], references: [id], onDelete: Cascade)
-  roomId Int
+  roomId String
 
   reactions Reaction[]
 
@@ -131,15 +131,15 @@ model GroupMessage {
 }
 
 model DirectMessage {
-  id          Int      @id @default(autoincrement())
-  content     String
-  createdAt   DateTime @default(now())
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
 
-  sender   User @relation("SentDMs", fields: [senderId], references: [id], onDelete: Cascade)
-  senderId Int
+  sender   User   @relation("SentDMs", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId String
 
-  recipient   User @relation("ReceivedDMs", fields: [recipientId], references: [id], onDelete: Cascade)
-  recipientId Int
+  recipient   User   @relation("ReceivedDMs", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientId String
 
   reactions Reaction[]
 
@@ -148,18 +148,18 @@ model DirectMessage {
 }
 
 model Reaction {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   emoji     String
   createdAt DateTime @default(now())
 
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 
   groupMessage   GroupMessage? @relation(fields: [groupMessageId], references: [id], onDelete: Cascade)
-  groupMessageId Int?
+  groupMessageId String?
 
   directMessage   DirectMessage? @relation(fields: [directMessageId], references: [id], onDelete: Cascade)
-  directMessageId Int?
+  directMessageId String?
 
   @@unique([userId, groupMessageId, emoji])
   @@unique([userId, directMessageId, emoji])

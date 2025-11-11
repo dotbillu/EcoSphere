@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAtom } from "jotai";
-import { userAtom } from "../../../store";
+import { userAtom } from "@/store";
 import { MapElement } from "./MapTypes";
 import { Loader2 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/constants";
@@ -39,7 +39,7 @@ export default function CreateRoomModal({
     formData.append("description", description);
     formData.append("latitude", location.lat.toString());
     formData.append("longitude", location.lng.toString());
-    formData.append("creatorId", user.id.toString());
+    formData.append("creatorId", user.id); // CHANGED: user.id is now a string (UUID)
     formData.append("type", type);
     if (image) formData.append("image", image);
 
@@ -162,4 +162,3 @@ export default function CreateRoomModal({
     </div>
   );
 }
-

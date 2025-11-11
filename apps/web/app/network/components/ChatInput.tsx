@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface ChatInputProps {
   onSend: (content: string) => void;
-  onGetSendButtonPosition: (buttonElement: HTMLButtonElement) => void; 
+  onGetSendButtonPosition: (buttonElement: HTMLButtonElement) => void;
 }
 const INITIAL_WIDTH = 900;
 const MAX_WIDTH_PERCENTAGE = 0.9;
@@ -35,11 +35,11 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, onGetSendButtonPosition }
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isEnabled) return;
-    
+
     if (sendButtonRef.current) {
-        onGetSendButtonPosition(sendButtonRef.current);
+      onGetSendButtonPosition(sendButtonRef.current);
     }
-    
+
     onSend(content);
     setContent("");
   };
@@ -58,7 +58,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, onGetSendButtonPosition }
       const maxWidth = parentWidth * MAX_WIDTH_PERCENTAGE;
 
       const textWidth = widthMeasureRef.current.scrollWidth;
-      
+
       const buttonSpace = isEnabled ? PADDING_AND_BUTTONS : PADDING_AND_BUTTONS - 40;
       const newDynamicWidth = textWidth + buttonSpace;
 
@@ -145,9 +145,9 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, onGetSendButtonPosition }
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 type="submit"
                 className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center 
-                            transition-colors duration-200 ease-out
-                            bg-indigo-600 hover:bg-indigo-700 text-white
-                            mb-1`}
+                             transition-colors duration-200 ease-out
+                             bg-indigo-600 hover:bg-indigo-700 text-white
+                             mb-1`}
               >
                 <SendHorizontal size={18} />
               </motion.button>

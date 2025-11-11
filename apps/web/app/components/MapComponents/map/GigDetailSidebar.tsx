@@ -16,19 +16,19 @@ import {
   Loader2,
 } from "lucide-react";
 import { useState } from "react";
-import { getImageUrl } from "../../../lib/utils";
+import { getImageUrl } from "@lib/utils";
 import { GigElement, MapElement } from "./MapTypes";
-import { motion } from "framer-motion"; // <-- Import motion
+import { motion } from "framer-motion";
 import { API_BASE_URL } from "@/lib/constants";
 
 type GigDetailSidebarProps = {
   gig: GigElement;
-  currentUserId?: number;
+  currentUserId?: string;
   onClose: () => void;
   onNavigate: () => void;
   onDelete: () => void;
   onShowLightbox: (index: number) => void;
-  onSaveEdit: (updatedData: Partial<GigElement> & { roomId?: number | null }) => void;
+  onSaveEdit: (updatedData: Partial<GigElement> & { roomId?: string | null }) => void;
   onSelectRoom: (room: MapElement) => void;
 };
 
@@ -85,17 +85,19 @@ export default function GigDetailSidebar({
   };
 
   const handleConnectRoom = async () => {
-    const rId = parseInt(connectRoomId, 10);
-    if (isNaN(rId)) {
-      setModalError("Invalid Room ID.");
+    const rId = connectRoomId.trim();
+    if (!rId) {
+      setModalError("Room ID cannot be empty.");
       return;
     }
+    
+    // UUIDs are strings, so no parseInt needed, but we check validity on the backend
     setIsVerifying(true);
     setModalError(null);
     try {
       const res = await fetch(`${API_BASE_URL}/map/room/${rId}`);
       if (!res.ok) {
-        throw new Error("Room not found.");
+        throw new Error("Room not found or ID is invalid.");
       }
       onSaveEdit({ roomId: rId });
       setShowRoomModal(false);
@@ -134,7 +136,7 @@ export default function GigDetailSidebar({
                 setConnectRoomId(e.target.value);
                 setModalError(null);
               }}
-              placeholder="Room ID..."
+              placeholder="Room ID (UUID)..."
               className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-100 focus:outline-none focus:border-white/50 focus:ring-2 focus:ring-white/30 transition"
             />
             {modalError && (

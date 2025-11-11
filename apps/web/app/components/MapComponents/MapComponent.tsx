@@ -8,12 +8,12 @@ import {
   MarkerF,
 } from "@react-google-maps/api";
 import { useSearchParams, useRouter } from "next/navigation";
-import { locationAtom, userAtom } from "../../store";
+import { locationAtom, userAtom } from "@/store";
 import { Home, Star, Layers } from "lucide-react";
 import Image from "next/image";
 import { AnimatePresence } from "framer-motion";
 
-import { getImageUrl } from "../../lib/utils";
+import { getImageUrl } from "@lib/utils";
 import { mapOptions } from "./map/mapOptions";
 import { MapElement, GigElement } from "./map/MapTypes";
 import GigDetailSidebar from "./map/GigDetailSidebar";
@@ -21,7 +21,7 @@ import RoomDetailSidebar from "./map/RoomDetailSidebar";
 import Lightbox from "./map/Lightbox";
 import CreateRoomModal from "./map/CreateRoomModal";
 import CreateGigModal from "./map/CreateGigModal";
-import { API_BASE_URL } from "@/lib/constants";
+import { API_BASE_URL } from "@lib/constants";
 
 // Helper function
 const sanitizeCoords = (item: any) => {

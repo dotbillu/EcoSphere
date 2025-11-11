@@ -30,7 +30,7 @@ const toggleFollow = async ({
   currentUserId,
   targetUsername,
 }: {
-  currentUserId: number;
+  currentUserId: string; // CHANGED: from number to string (UUID)
   targetUsername: string;
 }) => {
   const res = await fetch(`${API_BASE_URL}/user/follow`, {
@@ -48,8 +48,8 @@ const toggleLike = async ({
   userId,
   postId,
 }: {
-  userId: number;
-  postId: number;
+  userId: string; // CHANGED: from number to string (UUID)
+  postId: string; // CHANGED: from number to string (UUID)
 }) => {
   const res = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
     method: "POST",
@@ -89,6 +89,7 @@ export default function Profile() {
   const isOwner = loggedInUser?.username === profile?.username;
 
   const isFollowing = useMemo(() => {
+    // Check if loggedInUser.id (string) is in profile.followers (array of objects with string id)
     if (!loggedInUser?.id || !profile?.followers) return false;
     return profile.followers.some((user) => user.id === loggedInUser.id);
   }, [profile?.followers, loggedInUser?.id]);
@@ -133,9 +134,9 @@ export default function Profile() {
     setIsEditModalOpen(false);
   };
 
-  const handleLikeToggle = (postId: number) => {
+  const handleLikeToggle = (postId: string) => {
     if (!loggedInUser?.id || !profile) return;
-    const currentUserId = loggedInUser.id;
+    const currentUserId = loggedInUser.id; // string
     const queryKey = ["profile", usernameFromUrl];
 
     queryClient.setQueryData<UserProfile>(queryKey, (previousProfile) => {
@@ -144,18 +145,18 @@ export default function Profile() {
       return {
         ...previousProfile,
         posts: previousProfile.posts.map((post) => {
-          if (post.id === postId) {
+          if (post.id === postId) { // Compare string IDs
             const isLiked = post.likes.some(
-              (like) => like.userId === currentUserId,
+              (like) => like.userId === currentUserId, // Compare string IDs
             );
-            
+
             const optimisticLikeEntry = { userId: currentUserId };
 
             if (isLiked) {
               return {
                 ...post,
                 likes: post.likes.filter(
-                  (like) => like.userId !== currentUserId,
+                  (like) => like.userId !== currentUserId, // Compare string IDs
                 ),
                 _count: { ...post._count, likes: post._count.likes - 1 },
               };
@@ -178,13 +179,13 @@ export default function Profile() {
 
     likeDebounceTimer.current = setTimeout(() => {
       likeMutation.mutate({
-        userId: currentUserId,
-        postId: postId,
+        userId: currentUserId, // string
+        postId: postId, // string
       });
     }, 1000);
   };
 
-  const handleNavigateToPost = (postId: number) => {
+  const handleNavigateToPost = (postId: string) => {
     router.push(`/post/${postId}`);
   };
 
@@ -197,20 +198,20 @@ export default function Profile() {
       if (!oldProfile) return;
 
       const optimisticFollower = {
-        id: loggedInUser.id,
+        id: loggedInUser.id, // string
         username: loggedInUser.username,
         name: loggedInUser.name,
         image: loggedInUser.image,
       };
 
       const alreadyFollowing = oldProfile.followers.some(
-        (f) => f.id === loggedInUser.id,
+        (f) => f.id === loggedInUser.id, // Compare string IDs
       );
       let newFollowers;
 
       if (alreadyFollowing) {
         newFollowers = oldProfile.followers.filter(
-          (f) => f.id !== loggedInUser.id,
+          (f) => f.id !== loggedInUser.id, // Compare string IDs
         );
       } else {
         newFollowers = [...oldProfile.followers, optimisticFollower];
@@ -224,7 +225,7 @@ export default function Profile() {
 
     followDebounceTimer.current = setTimeout(() => {
       followMutation.mutate({
-        currentUserId: loggedInUser.id,
+        currentUserId: loggedInUser.id, // string
         targetUsername: profile.username,
       });
     }, 1000);

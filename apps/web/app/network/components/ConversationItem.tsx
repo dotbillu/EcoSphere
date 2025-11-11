@@ -23,14 +23,17 @@ function formatTimestamp(timestamp: string | null): string {
 }
 
 interface ConversationItemProps {
-  item: ChatMapRoom | SimpleUser;
+  item: ChatMapRoom | SimpleUser | null; // Updated type to accept null
   type: 'room' | 'dm';
   isSelected: boolean;
   onClick: () => void;
 }
 
 const ConversationItem: React.FC<ConversationItemProps> = ({ item, type, isSelected, onClick }) => {
-  const name = item.name ;
+  // ADDED: Defensive return if item is null or undefined
+  if (!item) return null; 
+
+  const name = item.name;
   const imageUrl = type === 'room' ? (item as ChatMapRoom).imageUrl : (item as SimpleUser).image;
   
   const placeholder = `https://placehold.co/40x40/4f46e5/white?text=${name.charAt(0).toUpperCase()}`

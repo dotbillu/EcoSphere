@@ -19,16 +19,14 @@ router.get("/feed", async (req, res) => {
   }
 
   try {
-    const currentUserId = parseInt(userId as string);
+    const currentUserId = userId as string; // No parseInt
     const skipNum = parseInt(skip as string) || 0;
     const takeNum = parseInt(take as string) || 10; // Default to 10 items
 
-    if (isNaN(currentUserId)) {
-      return res.status(400).json({ message: "Invalid userId" });
-    }
-
+    // No isNaN check needed, just check if it was provided (already done)
+    
     const user = await prisma.user.findUnique({
-      where: { id: currentUserId },
+      where: { id: currentUserId }, // ID is now a string
       include: {
         following: {
           select: { id: true, username: true },
@@ -40,7 +38,7 @@ router.get("/feed", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const followedUserIds = user.following.map((u) => u.id);
+    const followedUserIds = user.following.map((u) => u.id); // This is now string[]
     const followedUsernames = user.following.map((u) => u.username);
 
     if (followedUserIds.length === 0) {
@@ -78,7 +76,7 @@ router.get("/feed", async (req, res) => {
     if (filterGigs === "true") {
       const gigs = await prisma.gig.findMany({
         where: {
-          creatorId: { in: followedUserIds },
+          creatorId: { in: followedUserIds }, // Compares string[]
         },
         orderBy: { createdAt: "desc" },
         include: {
@@ -107,7 +105,7 @@ router.get("/feed", async (req, res) => {
     if (filterRooms === "true") {
       const rooms = await prisma.mapRoom.findMany({
         where: {
-          creatorId: { in: followedUserIds },
+          creatorId: { in: followedUserIds }, // Compares string[]
         },
         orderBy: { createdAt: "desc" },
         include: {

@@ -17,30 +17,29 @@ import { userAtom } from "../../store";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-// Assuming getImageUrl is available and works as in the provided files
 import { getImageUrl } from "@lib/utils";
 import { API_BASE_URL } from "@/lib/constants";
 
-// --- Type Definitions (from original) ---
+// --- Type Definitions (Updated for UUIDs) ---
 interface UserInfo {
   name: string;
   username: string;
   image: string | null;
 }
 interface Comment {
-  id: number;
+  id: string | number; // Updated to string | number (number is for optimistic temp ID)
   content: string;
   createdAt: string;
   user: UserInfo;
 }
 interface Like {
-  userId: number;
+  userId: string; // CHANGED: from number to string (UUID)
   user: {
     username: string;
   };
 }
 interface FullPost {
-  id: number;
+  id: string; // CHANGED: from number to string (UUID)
   username: string;
   name?: string;
   content: string;
@@ -56,7 +55,7 @@ interface FullPost {
   };
 }
 
-// --- Image Grid Component (Borrowed/Adapted from PostEntry) ---
+// --- Image Grid Component ---
 const PostImageGrid = ({
   imageUrls,
   openModal,
@@ -181,14 +180,14 @@ export default function PostDetailPage() {
 
   const router = useRouter();
   const params = useParams();
-  const { id: postId } = params;
+  const { id: postId } = params; // postId is already a string (UUID)
 
   const [user] = useAtom(userAtom);
-  const currentUserId = user?.id;
+  const currentUserId = user?.id; // currentUserId is a string (UUID)
   const currentUserImage = user?.image;
   const currentUserStatus = user ? "authenticated" : "unauthenticated";
 
-  // [NEW] Like Debounce Timer (like in Feedbox)
+  // Like Debounce Timer
   const likeDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -196,7 +195,7 @@ export default function PostDetailPage() {
     const fetchPost = async () => {
       setLoading(true);
       try {
-        // NOTE: The previous fetch was missing getImageUrl, fixed here, but still uses hardcoded URL
+        // postId is a string
         const res = await fetch(`${API_BASE_URL}/posts/${postId}`);
         if (!res.ok) throw new Error("Post not found");
         const data: FullPost = await res.json();
@@ -244,6 +243,7 @@ export default function PostDetailPage() {
   const handleLikeToggle = () => {
     if (!currentUserId || !post) return;
 
+    // Compare string UUIDs
     const isLiked = post.likes.some((like) => like.userId === currentUserId);
 
     // 1. Optimistic UI Update
@@ -252,6 +252,7 @@ export default function PostDetailPage() {
       if (isLiked) {
         return {
           ...prevPost,
+          // Filter using string ID
           likes: prevPost.likes.filter((like) => like.userId !== currentUserId),
           _count: { ...prevPost._count, likes: prevPost._count.likes - 1 },
         };
@@ -260,7 +261,7 @@ export default function PostDetailPage() {
           ...prevPost,
           likes: [
             ...prevPost.likes,
-            // Mock like object
+            // Mock like object using string ID
             { userId: currentUserId, user: { username: user?.username || "" } },
           ],
           _count: { ...prevPost._count, likes: prevPost._count.likes + 1 },
@@ -276,31 +277,29 @@ export default function PostDetailPage() {
     // 3. Set a new timer to send the actual request
     likeDebounceTimer.current = setTimeout(async () => {
       try {
+        // postId is a string
         const res = await fetch(`${API_BASE_URL}/posts/${post.id}/like`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          // Send userId as string
           body: JSON.stringify({ userId: currentUserId }),
         });
         if (!res.ok) throw new Error("API call failed");
-        // We'd typically re-fetch/invalidate a query here in a real scenario
-        // but since we don't have react-query here, we just let the optimistic
-        // update stand and log any error.
       } catch (err) {
         console.error("Failed to toggle like (server):", err);
-        // NOTE: In a robust app without react-query, you'd need logic here to
-        // manually revert the optimistic update on error.
+        // NOTE: Manual rollback is still necessary here on error.
       }
     }, 1000); // 1-second debounce
   };
 
-  // --- Comment Submission (Kept simple, no change) ---
+  // --- Comment Submission ---
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUserId || !post || !comment.trim()) return;
 
     setIsSubmitting(true);
     const newCommentTemp: Comment = {
-      id: Date.now(), // Temp ID for optimistic update
+      id: Date.now(), // Temp ID (still a number for optimistic ID)
       content: comment,
       createdAt: new Date().toISOString(),
       user: {
@@ -325,13 +324,14 @@ export default function PostDetailPage() {
     setComment("");
 
     try {
+      // postId is a string
       const res = await fetch(
         `${API_BASE_URL}/posts/${post.id}/comment`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            userId: currentUserId,
+            userId: currentUserId, // userId is a string
             content: newCommentTemp.content,
           }),
         },
@@ -345,6 +345,7 @@ export default function PostDetailPage() {
         if (!prevPost) return null;
         return {
           ...prevPost,
+          // Match by temp number ID, replace with final object which has the final string ID
           comments: prevPost.comments.map((c) =>
             c.id === newCommentTemp.id ? finalComment : c,
           ),
@@ -380,7 +381,6 @@ export default function PostDetailPage() {
   }
 
   if (!post) {
-    // Already handled in loading check, but good for type safety
     return (
       <div className="w-full max-w-2xl mx-auto border-l border-r border-gray-700 min-h-screen bg-black">
         <div className="sticky top-0 bg-black/80 backdrop-blur-md z-10 flex items-center gap-4 p-4 border-b border-gray-700">
@@ -396,7 +396,7 @@ export default function PostDetailPage() {
     );
   }
 
-  const isLikedByCurrentUser = post.likes.some(
+  const isLikedByCurrentUserFinal = post.likes.some(
     (like) => like.userId === currentUserId,
   );
 
@@ -469,12 +469,12 @@ export default function PostDetailPage() {
               onClick={handleLikeToggle}
               disabled={currentUserStatus !== "authenticated"}
               className={`flex items-center gap-1.5 transition-colors duration-200 group ${
-                isLikedByCurrentUser ? "text-red-500" : "hover:text-red-500"
+                isLikedByCurrentUserFinal ? "text-red-500" : "hover:text-red-500"
               } ${currentUserStatus !== "authenticated" ? "opacity-50" : ""}`}
             >
               <Heart
                 size={18}
-                fill={isLikedByCurrentUser ? "currentColor" : "none"}
+                fill={isLikedByCurrentUserFinal ? "currentColor" : "none"}
                 className="group-hover:scale-110 transition-transform"
               />
               <span className="text-sm">{post._count.likes}</span>
@@ -514,7 +514,7 @@ export default function PostDetailPage() {
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Post your reply"
-            className="textarea textarea-bordered w-full bg-zinc-900 text-white placeholder-zinc-500  p-2 rounded-lg   resize-none"
+            className="textarea textarea-bordered w-full bg-zinc-900 text-white placeholder-zinc-500  p-2 rounded-lg  resize-none"
             rows={2}
           />
           <button

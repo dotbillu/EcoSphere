@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Calendar } from "lucide-react";
 import { Gig } from "../../store";
 import { getImageUrl } from "../../lib/utils";
-import Link from "next/link"; 
+import Link from "next/link";
 
 export default function ProfileGig({
   gig,

@@ -33,7 +33,6 @@ export default function CreatePost({
       </p>
     );
 
-  // --- (All other functions like handleImageChange, handleLocationToggle are unchanged) ---
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
@@ -42,7 +41,10 @@ export default function CreatePost({
       return;
     }
     setImages((prev) => [...prev, ...files]);
-    setPreviews((prev) => [...prev, ...files.map((f) => URL.createObjectURL(f))]);
+    setPreviews((prev) => [
+      ...prev,
+      ...files.map((f) => URL.createObjectURL(f)),
+    ]);
     setError("");
   };
 
@@ -54,7 +56,8 @@ export default function CreatePost({
   const requestLocation = async () => {
     if (!navigator.geolocation) return alert("Geolocation not supported");
     navigator.geolocation.getCurrentPosition(
-      (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (pos) =>
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => alert("Permission denied or failed to get location"),
     );
   };
@@ -62,10 +65,12 @@ export default function CreatePost({
   const getCityFromCoords = async (lat: number, lng: number) => {
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
       );
       const data = await res.json();
-      return data.address?.city || data.address?.town || data.address?.village || "";
+      return (
+        data.address?.city || data.address?.town || data.address?.village || ""
+      );
     } catch {
       return "";
     }
@@ -86,7 +91,7 @@ export default function CreatePost({
       setLocationName("");
     }
   };
-  
+
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (e.target.value.length > 5000) return;
     setContent(e.target.value);
@@ -99,8 +104,6 @@ export default function CreatePost({
     }
   };
 
-
-  // 2. UPDATED handlePost FUNCTION:
   const handlePost = async () => {
     if (!content.trim() && images.length === 0) {
       setError("Write something or add at least one image!");
@@ -113,7 +116,8 @@ export default function CreatePost({
     formData.append("username", user.username);
     formData.append("name", user.name);
     formData.append("content", content);
-    if (includeLocation && locationName) formData.append("location", locationName);
+    if (includeLocation && locationName)
+      formData.append("location", locationName);
     images.forEach((img) => formData.append("images", img));
 
     try {
@@ -123,22 +127,17 @@ export default function CreatePost({
       });
       if (!res.ok) throw new Error(await res.text());
 
-      // Get the new post from the response
       const newPost: Post = await res.json();
 
-      // Reset the form
       setContent("");
       setImages([]);
       setPreviews([]);
       setIncludeLocation(false);
       setLocationName("");
-      
-      // 3. CALL THE PARENT'S FUNCTION with the new post
+
       if (onPostCreated) {
         onPostCreated(newPost);
       }
-      // No more window.location.reload()
-
     } catch {
       setError("Upload failed. Please try again.");
     } finally {
@@ -146,7 +145,6 @@ export default function CreatePost({
     }
   };
 
-  // --- (JSX is unchanged) ---
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -190,7 +188,12 @@ export default function CreatePost({
                 key={index}
                 className="relative w-32 h-32 rounded-2xl overflow-hidden border border-gray-700"
               >
-                <NextImage src={src} alt={`preview-${index}`} fill className="object-cover" />
+                <NextImage
+                  src={src}
+                  alt={`preview-${index}`}
+                  fill
+                  className="object-cover"
+                />
                 <button
                   onClick={() => removeImage(index)}
                   className="absolute top-1 right-1 bg-black/60 rounded-full p-1 hover:bg-black/80 transition"
@@ -222,7 +225,6 @@ export default function CreatePost({
                 }`}
               >
                 <MapPin className="w-5 h-5" />
-                
               </button>
               <button
                 onClick={handlePost}

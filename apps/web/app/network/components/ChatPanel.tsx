@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAtom } from "jotai";
 import {
@@ -27,7 +27,7 @@ const SCROLL_THRESHOLD = 200;
 const ChatPanel: React.FC = () => {
   const [currentUser] = useAtom(userAtom);
   const [selectedConversation, setSelectedConversation] = useAtom(
-    selectedConversationAtom,
+    selectedConversationAtom
   );
   const [messages, setMessages] = useAtom(messagesAtom);
   const [error, setError] = useAtom(networkErrorAtom);
@@ -46,34 +46,32 @@ const ChatPanel: React.FC = () => {
   const oldScrollHeightRef = useRef(0);
 
   useEffect(() => {
-    if (fetchedMessages) {
-      setMessages(fetchedMessages);
-    } else {
-      setMessages([]);
-    }
+    if (fetchedMessages) setMessages(fetchedMessages);
+    else setMessages([]);
   }, [fetchedMessages, setMessages]);
 
   useEffect(() => {
-    if (isError) {
-      setError("Failed to fetch messages");
-    } else {
-      setError(null);
-    }
+    if (isError) setError("Failed to fetch messages");
+    else setError(null);
   }, [isError, setError]);
 
-  // Pagination scroll fix: Adjust scroll position after loading older messages
   useEffect(() => {
-    if (
-      !isLoadingMore &&
-      scrollContainerRef.current &&
-      oldScrollHeightRef.current > 0
-    ) {
+    if (!scrollContainerRef.current) return;
+
+    if (oldScrollHeightRef.current > 0 && !isLoadingMore) {
       const newScrollHeight = scrollContainerRef.current.scrollHeight;
       scrollContainerRef.current.scrollTop =
         newScrollHeight - oldScrollHeightRef.current;
       oldScrollHeightRef.current = 0;
+    } else if (oldScrollHeightRef.current === 0 && !isLoadingMessages && fetchedMessages) {
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop =
+            scrollContainerRef.current.scrollHeight;
+        }
+      }, 50);
     }
-  }, [isLoadingMore]);
+  }, [isLoadingMessages, isLoadingMore, fetchedMessages, setMessages]);
 
   const fetchMoreMessages = () => {
     if (isLoadingMore || !hasNextPage || !scrollContainerRef.current) return;
@@ -85,20 +83,15 @@ const ChatPanel: React.FC = () => {
     if (
       scrollContainerRef.current &&
       scrollContainerRef.current.scrollTop < SCROLL_THRESHOLD
-    ) {
+    )
       fetchMoreMessages();
-    }
-  };
-
-  const getSendButtonPosition = (buttonElement: HTMLButtonElement) => {
-    // Left empty as it's no longer used
   };
 
   const handleSendMessage = async (content: string) => {
     if (!selectedConversation || content.trim() === "" || !currentUser) return;
     let url = "";
     let body: any = {};
-    const tempId = crypto.randomUUID();
+    const tempId = crypto.randomUUID(); // ID is always a string (UUID) now
 
     const tempSender: SimpleUser = {
       id: currentUser.id,
@@ -120,7 +113,9 @@ const ChatPanel: React.FC = () => {
 
     let tempMessage: MessageType;
     if (selectedConversation.type === "room") {
+      // roomId is string (UUID)
       url = `${API_BASE_URL}/chat/room/${selectedConversation.data.id}/message`;
+      // senderId is string (UUID)
       body = { senderId: currentUser.id, content };
       tempMessage = {
         ...tempMessageBase,
@@ -129,18 +124,21 @@ const ChatPanel: React.FC = () => {
     } else {
       url = `${API_BASE_URL}/chat/dm`;
       body = {
-        senderId: currentUser.id,
-        recipientId: selectedConversation.data.id,
+        senderId: currentUser.id, // string (UUID)
+        recipientId: selectedConversation.data.id, // string (UUID)
         content,
       };
       tempMessage = {
         ...tempMessageBase,
-        recipientId: selectedConversation.data.id,
+        recipientId: selectedConversation.data.id, // string (UUID)
       } as DirectMessage;
     }
 
     setMessages((prev) => [...prev, tempMessage]);
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
+    setTimeout(
+      () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
+      0
+    );
 
     try {
       const res = await fetch(url, {
@@ -151,7 +149,8 @@ const ChatPanel: React.FC = () => {
       if (!res.ok) throw new Error("Failed to send message");
       const savedMessage: MessageType = await res.json();
       setMessages((prev) =>
-        prev.map((msg) => (msg.id === tempId ? savedMessage : msg)),
+        // Compare temporary string ID with message ID
+        prev.map((msg) => (msg.id === tempId ? savedMessage : msg))
       );
     } catch (err: any) {
       setError(err.message);
@@ -169,7 +168,7 @@ const ChatPanel: React.FC = () => {
       const res = await fetch(url, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: currentUser.id }),
+        body: JSON.stringify({ userId: currentUser.id }), // userId is string (UUID)
       });
       if (!res.ok) {
         setMessages(oldMessages);
@@ -182,15 +181,15 @@ const ChatPanel: React.FC = () => {
   };
 
   const handleToggleReaction = async (
-    messageId: number | string,
-    emoji: string,
+    messageId: number | string, // Can be string (UUID)
+    emoji: string
   ) => {
     if (!currentUser || !selectedConversation) return;
     const messageType = selectedConversation.type === "room" ? "group" : "dm";
     const message = messages.find((m) => m.id === messageId);
     if (!message) return;
     const existingReaction = message.reactions.find(
-      (r) => r.emoji === emoji && r.user.id === currentUser.id,
+      (r) => r.emoji === emoji && r.user.id === currentUser.id // user.id is string (UUID)
     );
     setMessages((prev) =>
       prev.map((msg) => {
@@ -200,10 +199,10 @@ const ChatPanel: React.FC = () => {
           : [
               ...msg.reactions,
               {
-                id: Date.now(),
+                id: Date.now(), // Temporary ID (will be replaced by server's string ID)
                 emoji,
                 user: {
-                  id: currentUser.id,
+                  id: currentUser.id, // string (UUID)
                   username: currentUser.username,
                   name: currentUser.name,
                   image: currentUser.image || null,
@@ -213,24 +212,25 @@ const ChatPanel: React.FC = () => {
               },
             ];
         return { ...msg, reactions: newReactions };
-      }),
+      })
     );
     try {
       const res = await fetch(`${API_BASE_URL}/chat/reaction`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: currentUser.id,
+          userId: currentUser.id, // string (UUID)
           emoji,
+          // messageId is string (UUID)
           groupMessageId: messageType === "group" ? messageId : undefined,
           directMessageId: messageType === "dm" ? messageId : undefined,
         }),
       });
       if (!res.ok) throw new Error("Failed to toggle reaction");
+      // Force refresh of query to pick up server-assigned reaction ID
       setSelectedConversation((conv) => ({ ...conv! }));
     } catch (err: any) {
       setError(err.message);
-      console.error("Failed to toggle reaction, state may be inconsistent.");
       setSelectedConversation((conv) => ({ ...conv! }));
     }
   };
@@ -255,11 +255,12 @@ const ChatPanel: React.FC = () => {
       ? selectedConversation.data.imageUrl
       : (selectedConversation.data as SimpleUser).image;
 
-  const placeholder = `https://placehold.co/40x40/4f46e5/white?text=${name.charAt(0).toUpperCase()}`;
+  const placeholder = `https://placehold.co/40x40/4f46e5/white?text=${name
+    .charAt(0)
+    .toUpperCase()}`;
   const src = imageUrl ? `${API_BASE_URL}/uploads/${imageUrl}` : placeholder;
 
   return (
-    // MODIFICATION HERE: Changed `flex-grow` to `w-3/4` to force a wider, fixed ratio.
     <div className="w-3/4 flex-col hidden md:flex bg-black relative">
       <div className="flex items-center p-4 bg-black border-b border-white/20">
         <Link
@@ -324,12 +325,9 @@ const ChatPanel: React.FC = () => {
         )}
         <div ref={messagesEndRef} />
       </div>
-      <ChatInput
-        onSend={handleSendMessage}
-        onGetSendButtonPosition={getSendButtonPosition}
-      />
+      <ChatInput onSend={handleSendMessage} onGetSendButtonPosition={() => {}} />
     </div>
   );
-};
+}
 
 export default ChatPanel;

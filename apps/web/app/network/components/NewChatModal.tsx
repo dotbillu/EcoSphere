@@ -12,7 +12,7 @@ const NewChatModal: React.FC = () => {
   const setIsModalOpen = useSetAtom(isNewChatModalOpenAtom);
   const setDmConversations = useSetAtom(dmConversationsAtom);
   const setSelectedConversation = useSetAtom(selectedConversationAtom);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredFollowing = followingList.filter(user =>
@@ -22,15 +22,18 @@ const NewChatModal: React.FC = () => {
 
   const handleSelectUser = (user: SimpleUser) => {
     setIsModalOpen(false);
-    
+
     setDmConversations(prev => {
+      // user.id is a string (UUID)
       const existingDm = prev.find(dm => dm.id === user.id);
       if (!existingDm) {
+        // user object already has the correct string ID
         return [user, ...prev];
       }
       return prev;
     });
-    
+
+    // Set selected conversation with the user object (which has the string ID)
     setSelectedConversation({ type: 'dm', data: user });
   };
 
@@ -51,7 +54,7 @@ const NewChatModal: React.FC = () => {
             <X size={20} />
           </button>
         </div>
-        
+
         <div className="p-2 border-b border-gray-700">
           <div className="relative">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />

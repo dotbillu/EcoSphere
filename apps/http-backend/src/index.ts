@@ -2,10 +2,10 @@ import express from "express";
 import cors from "cors";
 import userRoutes from "./routes/user";
 import postRoutes from "./routes/posts";
-import mapRoutes from './routes/map';
+import mapRoutes from '@maps';
 import searchRoutes from "./routes/search"
 import globalRoutes from "./routes/global";
-import chatRoutes from "./routes/chat"
+import chatRoutes from "@chats"
 import networkRoutes from "./routes/network"
 const app = express();
 const PORT = 4000;

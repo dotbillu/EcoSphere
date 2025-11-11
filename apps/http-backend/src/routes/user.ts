@@ -259,7 +259,7 @@ router.post("/follow", async (req, res) => {
       where: { username: targetUsername },
       include: profileInclude,
     });
-    
+
     const formattedProfile = formatProfileRooms(updatedTargetProfile);
     res.status(200).json({
       message: actionMessage,

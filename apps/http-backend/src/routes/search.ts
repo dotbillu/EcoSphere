@@ -18,15 +18,15 @@ router.get("/", async (req, res) => {
 
   const searchTerm = query.trim();
   const isFollowersOnly = followersOnly === "true";
-  const userIdNum = parseInt(currentUserId as string);
+  const userIdStr = currentUserId as string;
 
   let followedUsernames: string[] = [];
-  let followedUserIds: number[] = [];
+  let followedUserIds: string[] = [];
 
-  if (isFollowersOnly && !isNaN(userIdNum)) {
+  if (isFollowersOnly && userIdStr) {
     // Get the list of users the current user follows
     const user = await prisma.user.findUnique({
-      where: { id: userIdNum },
+      where: { id: userIdStr },
       include: {
         following: {
           select: { id: true, username: true },

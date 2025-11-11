@@ -12,8 +12,8 @@ interface MessageBubbleProps {
   message: MessageType;
   isMe: boolean;
   isGroup: boolean;
-  onDelete: (messageId: number | string) => void;
-  onToggleReaction: (messageId: number | string, emoji: string) => void;
+  onDelete: (messageId: string) => void;
+  onToggleReaction: (messageId: string, emoji: string) => void;
   spacing: 'small' | 'large';
 }
 
@@ -46,13 +46,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const hasReactions = Object.entries(groupedReactions).length > 0;
 
   // Animation delay values
-  const bubbleEnterDelay = 0.45; // Existing delay for the bubble's final pop
-  const reactionEnterDelay = bubbleEnterDelay + 0.1; // Reactions appear slightly after the bubble is settled
+  const bubbleEnterDelay = 0.45;
+  const reactionEnterDelay = bubbleEnterDelay + 0.1;
 
   return (
-    <div 
-        id={`message-${message.id}`}
-        className={`flex group ${isMe ? 'justify-end' : 'justify-start'} ${spacing === 'large' ? 'mt-6' : 'mt-2'} ${hasReactions ? 'mb-8' : ''}`}
+    <div
+      id={`message-${message.id}`}
+      className={`flex group ${isMe ? 'justify-end' : 'justify-start'} ${spacing === 'large' ? 'mt-6' : 'mt-2'} ${hasReactions ? 'mb-8' : ''}`}
     >
       <div
         className={`
@@ -74,24 +74,24 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         {isMe && <div className="w-8 h-8 flex-shrink-0" />}
 
         <motion.div
-            {...(isMe && {
-                initial: { scale: 0.8, opacity: 0 },
-                animate: { scale: 1, opacity: 1 },
-                transition: { 
-                    type: 'spring', 
-                    stiffness: 300, 
-                    damping: 20, 
-                    delay: bubbleEnterDelay 
-                },
-                layout: true, 
-            })}
-            className={`
-                px-3 py-2 rounded-2xl shadow-sm relative
-                ${isMe
-                    ? 'bg-indigo-600 text-white rounded-br-lg'
-                    : 'bg-gray-700 text-gray-200 rounded-bl-lg'
-                }
-            `}
+          {...(isMe && {
+            initial: { scale: 0.8, opacity: 0 },
+            animate: { scale: 1, opacity: 1 },
+            transition: {
+              type: 'spring',
+              stiffness: 300,
+              damping: 20,
+              delay: bubbleEnterDelay
+            },
+            layout: true,
+          })}
+          className={`
+            px-3 py-2 rounded-2xl shadow-sm relative
+            ${isMe
+              ? 'bg-indigo-600 text-white rounded-br-lg'
+              : 'bg-gray-700 text-gray-200 rounded-bl-lg'
+            }
+          `}
         >
           {isGroup && !isMe && (
             <Link
@@ -116,7 +116,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             {isMe && <Check size={16} />}
           </div>
 
-          {/* New: Wrap the reaction bar in AnimatePresence and motion.div */}
           <AnimatePresence>
             {hasReactions && (
               <motion.div
@@ -124,11 +123,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 initial={{ opacity: 0, y: 5, scale: 0.8 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 5 }}
-                transition={{ 
-                    type: "spring", 
-                    stiffness: 300, 
-                    damping: 25, 
-                    delay: reactionEnterDelay 
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 25,
+                  delay: reactionEnterDelay
                 }}
                 className="absolute -bottom-4 right-0 flex gap-1 bg-gray-800 border border-gray-700 rounded-full px-2 py-0.5 shadow-md origin-bottom-right"
               >
@@ -152,7 +151,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </button>
           {isMe && (
             <button
-              onClick={() => onDelete(message.id)}
+              onClick={() => onDelete(message.id as string)}
               className="text-gray-400 hover:text-red-500"
               aria-label="Delete message"
             >
@@ -162,7 +161,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           {showEmojiPicker && (
             <div className={`absolute z-10 ${isMe ? 'right-full mr-55' : 'left-full ml-2'} -top-2`}>
               <EmojiPicker onSelect={(emoji) => {
-                onToggleReaction(message.id, emoji);
+                onToggleReaction(message.id as string, emoji);
                 setShowEmojiPicker(false);
               }} />
             </div>

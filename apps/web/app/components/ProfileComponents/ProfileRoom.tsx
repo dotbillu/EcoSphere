@@ -4,14 +4,13 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { MapRoom } from "../../store";
 import { getImageUrl } from "../../lib/utils";
-import Link from "next/link"; // <-- 1. Import Link
+import Link from "next/link";
 
 // -----------------------------------------------------------------
 // ProfileRoom Component
 // -----------------------------------------------------------------
 export default function ProfileRoom({ room }: { room: MapRoom }) {
   return (
-    // --- 2. Wrap everything in a Link component ---
     <Link href={`/map?roomId=${room.id}`} className="block">
       <motion.div
         key={room.id}
@@ -25,7 +24,7 @@ export default function ProfileRoom({ room }: { room: MapRoom }) {
           {/* Room Image */}
           <div className="relative w-28 h-28 rounded-xl overflow-hidden border border-zinc-700 shrink-0">
             <Image
-              src={getImageUrl(room.imageUrl || "")} // Use default/placeholder if no image
+              src={getImageUrl(room.imageUrl || "")}
               alt={room.name}
               fill
               style={{ objectFit: "cover" }}

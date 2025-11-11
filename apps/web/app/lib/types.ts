@@ -1,23 +1,21 @@
 import { MapRoom, UserProfile } from "../store";
 
 export interface SimpleUser {
-  id: number;
+  id: string; // CHANGED: from number to string (UUID)
   username: string;
   name: string;
   image: string | null;
-  // New fields for real data
   lastMessage: string | null;
   lastMessageTimestamp: string | null;
 }
 
 export interface Reaction {
-  id: number;
+  id: string; // CHANGED: from number to string (UUID)
   emoji: string;
   user: SimpleUser;
 }
 
 export type ChatMapRoom = Omit<MapRoom, "latitude" | "longitude"> & {
-  // New fields for real data
   lastMessage: string | null;
   lastMessageTimestamp: string | null;
 };
@@ -37,23 +35,30 @@ export type ChatUserProfile = Omit<
 };
 
 export interface GroupMessage {
-  id: number;
+  id: string; // CHANGED: from number to string (UUID)
   content: string;
   createdAt: string;
-  senderId: number;
+  senderId: string; // CHANGED: from number to string (UUID)
   sender: SimpleUser;
-  roomId: number;
+  roomId: string; // CHANGED: from number to string (UUID)
   reactions: Reaction[];
 }
 
 export interface DirectMessage {
-  id: number;
+  id: string; // CHANGED: from number to string (UUID)
   content: string;
   createdAt: string;
-  senderId: number;
+  senderId: string; // CHANGED: from number to string (UUID)
   sender: SimpleUser;
-  recipientId: number;
+  recipientId: string; // CHANGED: from number to string (UUID)
   reactions: Reaction[];
+}
+export interface ConversationItem {
+  id: string;
+  name: string;
+  avatar?: string;
+  lastMessage?: string;
+  updatedAt?: string;
 }
 
 export type MessageType = GroupMessage | DirectMessage;
