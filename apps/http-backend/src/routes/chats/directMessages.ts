@@ -16,7 +16,7 @@ const reactionSelect = {
   user: { select: senderSelect },
 };
 
-// GET DM history
+// GET DM history (FOR PAGINATION / LOADING OLD MESSAGES)
 router.get("/:otherUserId", async (req, res) => {
   const { otherUserId } = req.params;
   const { currentUserId, skip, take } = req.query;
@@ -55,27 +55,8 @@ router.get("/:otherUserId", async (req, res) => {
   }
 });
 
-// POST DM
-router.post("/", async (req, res) => {
-  const { senderId, recipientId, content } = req.body;
-  if (!senderId || !recipientId || !content)
-    return res.status(400).json({ message: "Missing fields" });
-
-  try {
-    const msg = await prisma.directMessage.create({
-      data: {
-        senderId: senderId, 
-        recipientId: recipientId, 
-        content,
-      },
-      include: { sender: { select: senderSelect }, reactions: true },
-    });
-    res.status(201).json(msg);
-  } catch (err) {
-    console.error("Error sending DM:", err);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+// --- POST DM (REMOVED) ---
+// This logic is now handled by the ws-backend
 
 // --- GET DM "Inbox" (List of users you've chatted with) ---
 router.get("/conversations/:userId", async (req, res) => {
@@ -97,7 +78,7 @@ router.get("/conversations/:userId", async (req, res) => {
       },
     });
 
-    const conversations = new Map<string, any>(); 
+    const conversations = new Map<string, any>();
 
     for (const message of messages) {
       const otherUser =
@@ -119,32 +100,12 @@ router.get("/conversations/:userId", async (req, res) => {
   }
 });
 
-// DELETE DM
+
+
 router.delete("/message/:messageId", async (req, res) => {
-  const { messageId } = req.params;
-  const { userId } = req.body; 
-
-  if (!userId) {
-    return res.status(400).json({ message: "userId is required in body" });
-  }
-
-  try {
-    const msg = await prisma.directMessage.findUnique({
-      where: { id: messageId }, 
-    });
-    if (!msg) return res.status(404).json({ message: "Message not found" });
-    if (msg.senderId !== userId) 
-      return res
-        .status(403)
-        .json({ message: "Not authorized to delete this message" });
-
-    await prisma.directMessage.delete({ where: { id: msg.id } });
-
-    res.json({ message: "Deleted successfully" });
-  } catch (err) {
-    console.error("Error deleting DM:", err);
-    res.status(500).json({ message: "Internal server error" });
-  }
+  res
+    .status(405)
+    .json({ message: "Delete method now handled by WebSocket server" });
 });
 
 export default router;

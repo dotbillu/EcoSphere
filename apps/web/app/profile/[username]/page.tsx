@@ -6,14 +6,14 @@ import { useState, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { Calendar, Loader2 } from "lucide-react";
-import EditProfileModal from "@components/ProfileComponents/EditProfileModal";
+import EditProfileModal from "@profilecomponents/EditProfileModal";
 import { useRouter, useParams } from "next/navigation";
 
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
-import ProfilePost from "@components/ProfileComponents/ProfilePost";
-import ProfileGig from "@components/ProfileComponents/ProfileGig";
-import ProfileRoom from "@components/ProfileComponents/ProfileRoom";
+import ProfilePost from "@profilecomponents/ProfilePost";
+import ProfileGig from "@profilecomponents/ProfileGig";
+import ProfileRoom from "@profilecomponents/ProfileRoom";
 
 import { getImageUrl } from "@lib/utils";
 import { API_BASE_URL } from "@/lib/constants";

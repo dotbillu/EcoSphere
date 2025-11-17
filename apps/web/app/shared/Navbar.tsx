@@ -1,10 +1,12 @@
 "use client";
+
 import {
   House,
   Map,
   BotMessageSquare,
   Network,
   User,
+  Search,
 } from "lucide-react";
 import { CurrentPageAtom, PageName, userAtom, UserProfile } from "../store";
 import { useAtom } from "jotai";
@@ -13,9 +15,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { API_BASE_URL } from "@/lib/constants";
 
-// CHANGED: Removed hardcoded API URL from the fetchProfile definition
 const fetchProfile = async (username: string): Promise<UserProfile> => {
-  // CHANGED: Use constant API_BASE_URL
   const res = await fetch(`${API_BASE_URL}/user/profile/${username}`);
   if (!res.ok) throw new Error("Failed to fetch profile");
   return res.json();
@@ -28,43 +28,45 @@ export default function Navbar() {
 
   const stkwidth = 1.5;
   const stksize = 20;
+
   const [currentPage, setCurrentPage] = useAtom(CurrentPageAtom);
   const [loggedInUser] = useAtom(userAtom);
 
   const icons = [
     { name: "House", Icon: House },
     { name: "Map", Icon: Map },
-    { name: "CHATAI", Icon: BotMessageSquare },
+    { name: "Search", Icon: Search },
     { name: "Network", Icon: Network },
     { name: "profile", Icon: User },
   ] as const;
 
   useEffect(() => {
     if (!loggedInUser?.username) return;
+
     router.prefetch(`/profile/${loggedInUser.username}`);
+
     queryClient.prefetchQuery({
       queryKey: ["profile", loggedInUser.username],
       queryFn: () => fetchProfile(loggedInUser.username),
       staleTime: 60_000,
     });
-    // CHANGED: Use constant API_BASE_URL
-    fetch(`${API_BASE_URL}/user/profile/${loggedInUser.username}`).catch(
-      () => {}
-    );
+
+    fetch(`${API_BASE_URL}/user/profile/${loggedInUser.username}`).catch(() => {});
   }, [loggedInUser, queryClient, router]);
 
   useEffect(() => {
     const currentPath = (pathname.split("/")[1] || "house").toLowerCase();
+
     switch (currentPath) {
-      case "house":
       case "":
+      case "house":
         setCurrentPage("House");
         break;
       case "map":
         setCurrentPage("Map");
         break;
-      case "chatai":
-        setCurrentPage("CHATAI");
+      case "search":
+        setCurrentPage("Search");
         break;
       case "network":
         setCurrentPage("Network");
@@ -86,11 +88,15 @@ export default function Navbar() {
       } else {
         router.push("/profile");
       }
-    } else if (pagename === "House") {
-      router.push("/house");
-    } else {
-      router.push(`/${pagename.toLowerCase()}`);
+      return;
     }
+
+    if (pagename === "House") {
+      router.push("/house");
+      return;
+    }
+
+    router.push(`/${pagename.toLowerCase()}`);
   }
 
   return (
@@ -113,3 +119,4 @@ export default function Navbar() {
     </div>
   );
 }
+

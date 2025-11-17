@@ -2,9 +2,9 @@
 
 import { Loader2, User, FileText, Briefcase, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { SearchResult } from "./SearchBar"; // We will create this type in SearchBar.tsx
-import { getImageUrl } from "@/lib/utils"; // Assuming you have this utility
+import { SearchResult } from "@/lib/types"; // Import from main types file
 import Image from "next/image";
+import { API_BASE_URL } from "@/lib/constants";
 
 interface SearchResultsProps {
   results: SearchResult[];
@@ -12,8 +12,22 @@ interface SearchResultsProps {
   onClose: () => void;
 }
 
-// Helper to get icon for each type
-const ResultIcon = ({ type }: { type: string }) => {
+const ResultIcon = ({ type, data }: { type: string, data: any }) => {
+  if (type === "user" && data.image) {
+    const placeholder = `https://placehold.co/40x40/4f46e5/white?text=${data.name.charAt(0).toUpperCase()}`;
+    const src = `${API_BASE_URL}/uploads/${data.image}`;
+    return (
+      <Image
+        src={src}
+        alt={data.name}
+        width={24}
+        height={24}
+        onError={(e) => (e.currentTarget.src = placeholder)}
+        className="w-6 h-6 rounded-full object-cover"
+      />
+    );
+  }
+
   switch (type) {
     case "user":
       return <User className="w-4 h-4 text-gray-500" />;
@@ -36,7 +50,7 @@ export default function SearchResults({
   const router = useRouter();
 
   const handleResultClick = (item: SearchResult) => {
-    onClose(); // Close the dropdown
+    onClose();
     let path = "/";
     switch (item.type) {
       case "user":
@@ -47,7 +61,6 @@ export default function SearchResults({
         break;
       case "gig":
       case "room":
-        // You might want a specific page, for now, let's go to the map
         path = `/map?id=${item.data.id}&type=${item.type}`;
         break;
     }
@@ -81,7 +94,7 @@ export default function SearchResults({
   };
 
   return (
-    <div className="absolute top-14 w-full max-h-96 overflow-y-auto bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+    <div className="w-full max-h-96 overflow-y-auto bg-white rounded-b-lg shadow-xl border-t-0 border border-gray-200 z-50">
       {isLoading && (
         <div className="flex justify-center items-center p-4">
           <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
@@ -100,8 +113,8 @@ export default function SearchResults({
             onClick={() => handleResultClick(item)}
             className="flex items-center p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100"
           >
-            <div className="flex-shrink-0 mr-3">
-              <ResultIcon type={item.type} />
+            <div className="flex-shrink-0 mr-3 w-6 h-6 flex items-center justify-center">
+              <ResultIcon type={item.type} data={item.data} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-black truncate">

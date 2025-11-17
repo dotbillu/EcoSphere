@@ -36,7 +36,6 @@ router.get("/rooms", async (req, res) => {
     });
     res.json(rooms);
   } catch (err) {
-    console.error("Error fetching rooms:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -94,7 +93,6 @@ router.post("/room", upload.single("image"), async (req, res) => {
       room: newRoom,
     });
   } catch (err) {
-    console.error("Error creating map room:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
@@ -130,7 +128,6 @@ router.post("/room/:roomId/join", async (req, res) => {
       room: updatedRoom,
     });
   } catch (err) {
-    console.error("Error joining room:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -166,7 +163,6 @@ router.post("/room/:roomId/leave", async (req, res) => {
       room: updatedRoom,
     });
   } catch (err) {
-    console.error("Error leaving room:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -190,7 +186,6 @@ router.delete("/room/:roomId", async (req, res) => {
     });
     res.status(200).json({ message: "Room deleted successfully" });
   } catch (err) {
-    console.error("Error deleting room:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -230,7 +225,6 @@ router.put("/room/:roomId", upload.single("image"), async (req, res) => {
 
     res.json({ message: "Room updated successfully", room: updatedRoom });
   } catch (err) {
-    console.error("Error editing room:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -255,6 +249,34 @@ router.get("/room/:roomId", async (req, res) => {
 
     if (!room) return res.status(404).json({ message: "Room not found" });
     res.json(room);
+  } catch (err) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.get("/rooms/search", async (req, res) => {
+  const { q: query } = req.query;
+
+  if (!query || typeof query !== "string") {
+    return res.status(400).json({ message: "Query 'q' is required" });
+  }
+
+  try {
+    const rooms = await prisma.mapRoom.findMany({
+      where: {
+        name: {
+          contains: query,
+          mode: "insensitive",
+        },
+      },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        imageUrl: true,
+      },
+    });
+    res.json(rooms);
   } catch (err) {
     res.status(500).json({ message: "Internal server error" });
   }

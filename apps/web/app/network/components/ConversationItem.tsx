@@ -23,15 +23,14 @@ function formatTimestamp(timestamp: string | null): string {
 }
 
 interface ConversationItemProps {
-  item: ChatMapRoom | SimpleUser | null; // Updated type to accept null
+  item: (ChatMapRoom | SimpleUser) & { type: "room" | "dm" } | null;
   type: 'room' | 'dm';
   isSelected: boolean;
   onClick: () => void;
 }
 
 const ConversationItem: React.FC<ConversationItemProps> = ({ item, type, isSelected, onClick }) => {
-  // ADDED: Defensive return if item is null or undefined
-  if (!item) return null; 
+  if (!item) return null;
 
   const name = item.name;
   const imageUrl = type === 'room' ? (item as ChatMapRoom).imageUrl : (item as SimpleUser).image;
@@ -41,6 +40,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({ item, type, isSelec
 
   const lastMessage = item.lastMessage || "";
   const time = formatTimestamp(item.lastMessageTimestamp);
+  const unseenCount = item.unseenCount || 0;
+  
+  // Get online status only for DMs
+  const isOnline = type === 'dm' ? (item as SimpleUser).isOnline : false;
 
   return (
     <button
@@ -50,24 +53,35 @@ const ConversationItem: React.FC<ConversationItemProps> = ({ item, type, isSelec
         ${isSelected ? 'bg-zinc-800' : 'hover:bg-zinc-900'}
       `}
     >
-      <img
-        src={src}
-        onError={(e) => (e.currentTarget.src = placeholder)}
-        alt={name}
-        className="w-12 h-12 rounded-full object-cover mr-3 flex-shrink-0"
-      />
+      <div className="relative flex-shrink-0">
+        <img
+          src={src}
+          onError={(e) => (e.currentTarget.src = placeholder)}
+          alt={name}
+          className="w-12 h-12 rounded-full object-cover mr-3"
+        />
+        {isOnline && (
+          <span className="absolute bottom-0 right-3 w-3.5 h-3.5 bg-green-500 border-2 border-black rounded-full"></span>
+        )}
+      </div>
+      
       <div className="flex-grow min-w-0">
         <h3 className="font-sans font-semibold text-base text-white truncate">
           {name}
         </h3>
         
-        {/* Real Data Rendered Here */}
-        <p className="text-sm text-zinc-400 truncate">
+        <p className={`text-sm truncate ${unseenCount > 0 ? 'text-white font-semibold' : 'text-zinc-400'}`}>
           {lastMessage}
           {lastMessage && time && " · "}
           {time}
         </p>
       </div>
+      
+      {unseenCount > 0 && (
+        <div className="ml-2 flex-shrink-0 flex items-center justify-center bg-green-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1.5 py-0.5">
+          {unseenCount > 99 ? '99+' : unseenCount}
+        </div>
+      )}
     </button>
   );
 };

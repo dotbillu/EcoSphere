@@ -3,13 +3,13 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Check, SmilePlus, Trash2 } from 'lucide-react';
-import { MessageType } from '@lib/types';
+import { MessageType } from '@lib/types'; // Make sure this imports your updated type
 import { API_BASE_URL } from '@lib/constants';
 import EmojiPicker from '../ui/EmojiPicker';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface MessageBubbleProps {
-  message: MessageType;
+  message: MessageType; // This will now have the optional isOptimistic prop
   isMe: boolean;
   isGroup: boolean;
   onDelete: (messageId: string) => void;
@@ -45,7 +45,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const hasReactions = Object.entries(groupedReactions).length > 0;
 
-  // Animation delay values
   const bubbleEnterDelay = 0.45;
   const reactionEnterDelay = bubbleEnterDelay + 0.1;
 
@@ -74,7 +73,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         {isMe && <div className="w-8 h-8 flex-shrink-0" />}
 
         <motion.div
-          {...(isMe && {
+          layout // <-- 1. APPLY LAYOUT TO ALL BUBBLES
+          // 2. ONLY ANIMATE IF isMe AND isOptimistic
+          {...(isMe && message.isOptimistic && {
             initial: { scale: 0.8, opacity: 0 },
             animate: { scale: 1, opacity: 1 },
             transition: {
@@ -83,7 +84,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               damping: 20,
               delay: bubbleEnterDelay
             },
-            layout: true,
           })}
           className={`
             px-3 py-2 rounded-2xl shadow-sm relative

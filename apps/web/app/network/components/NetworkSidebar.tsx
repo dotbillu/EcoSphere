@@ -1,27 +1,29 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
-import { useAtom, useSetAtom } from 'jotai';
-import { Users, User, Search, Loader2, MessageSquare, Pencil, X } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { useAtom, useSetAtom } from "jotai";
+import { Search, Loader2, Pencil, X } from "lucide-react";
 import {
   userAtom,
   userRoomsAtom,
   dmConversationsAtom,
   networkLoadingAtom,
   networkErrorAtom,
-  isNewChatModalOpenAtom
-} from '@/store';
-import ConversationList from './ConversationList';
-import { useQueryClient } from '@tanstack/react-query';
-import { API_BASE_URL } from '@lib/constants';
-import { MessageType } from '@lib/types';
-import SidebarSkeleton from '../ui/SidebarSkeleton';
+  isNewChatModalOpenAtom,
+} from "@/store";
+import ConversationList from "./ConversationList";
+import { useQueryClient } from "@tanstack/react-query";
+import { API_BASE_URL } from "@lib/constants";
+import { MessageType, ChatMapRoom, SimpleUser } from "@lib/types";
+import SidebarSkeleton from "../ui/SidebarSkeleton";
 
 const MESSAGES_PER_PAGE = 30;
 
-const fetchInitialMessages = async ({ queryKey }: any): Promise<MessageType[]> => {
+const fetchInitialMessages = async ({
+  queryKey,
+}: any): Promise<MessageType[]> => {
   const [_key, conversation] = queryKey;
-  const { type, id, currentUserId } = conversation; // id and currentUserId are strings
+  const { type, id, currentUserId } = conversation;
 
   let url = "";
   if (type === "room") {
@@ -37,9 +39,8 @@ const fetchInitialMessages = async ({ queryKey }: any): Promise<MessageType[]> =
   return messages;
 };
 
-
 export default function NetworkSidebar() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const searchBarRef = useRef<HTMLDivElement>(null);
 
@@ -52,32 +53,50 @@ export default function NetworkSidebar() {
 
   const queryClient = useQueryClient();
 
-  // Prefetching logic
+  const combinedAndSortedConversations = useMemo(() => {
+    const roomsWithType = userRooms.map((room) => ({
+      ...room,
+      type: "room" as const,
+    }));
+    const dmsWithType = dmConversations.map((dm) => ({
+      ...dm,
+      type: "dm" as const,
+    }));
+
+    const allConversations = [...roomsWithType, ...dmsWithType];
+
+    return allConversations.sort((a, b) => {
+      if (!a.lastMessageTimestamp) return 1;
+      if (!b.lastMessageTimestamp) return -1;
+      return (
+        new Date(b.lastMessageTimestamp).getTime() -
+        new Date(a.lastMessageTimestamp).getTime()
+      );
+    });
+  }, [userRooms, dmConversations]);
+
   useEffect(() => {
     if (user && (userRooms.length > 0 || dmConversations.length > 0)) {
-
       const conversations = [
-        ...userRooms.map(room => ({ type: 'room', data: room })),
-        ...dmConversations.map(dm => ({ type: 'dm', data: dm }))
+        ...userRooms.map((room) => ({ type: "room", data: room })),
+        ...dmConversations.map((dm) => ({ type: "dm", data: dm })),
       ];
 
-      conversations.forEach(conv => {
-        // ID is a string (UUID)
-        const queryKey = ['chat', { type: conv.type, id: conv.data.id, currentUserId: user.id }];
-
+      conversations.forEach((conv) => {
+        const queryKey = [
+          "chat",
+          { type: conv.type, id: conv.data.id, currentUserId: user.id },
+        ];
         queryClient.prefetchInfiniteQuery({
           queryKey: queryKey,
           queryFn: fetchInitialMessages,
           initialPageParam: 0,
-          // Since this is prefetching, we only need the first page.
-          // The hook useChatMessages handles the rest.
           getNextPageParam: () => undefined,
           staleTime: 1000 * 60 * 5,
         });
       });
     }
   }, [userRooms, dmConversations, user, queryClient]);
-
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -103,19 +122,23 @@ export default function NetworkSidebar() {
 
   return (
     <div className="flex flex-col w-full md:w-2/5 lg:w-1/3 flex-shrink-0 border-r border-r-zinc-800 bg-black h-full">
-
       <div className="flex items-center gap-2 px-4 py-3 mt-2">
         <div className="flex-grow" ref={searchBarRef}>
-          <div className={`relative flex items-center rounded-lg
+          <div
+            className={`relative flex items-center rounded-lg
                             transition-all duration-300 ease-out
-                            ${isExpanded ? 'bg-zinc-800' : 'bg-zinc-900'}`}>
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                            ${isExpanded ? "bg-zinc-800" : "bg-zinc-900"}`}
+          >
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+            />
             <input
               type="text"
               placeholder="Search ..."
               className={`w-full pl-10 pr-10 rounded-lg bg-transparent text-white placeholder:text-zinc-500
                             transition-all duration-300 ease-out
-                            ${isExpanded ? 'py-2.5' : 'py-1.5'}
+                            ${isExpanded ? "py-2.5" : "py-1.5"}
                             focus:ring-0 focus:outline-none`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -148,24 +171,12 @@ export default function NetworkSidebar() {
       </div>
 
       <div className="flex-grow overflow-y-auto relative">
-        {loading.profile && (
-          <SidebarSkeleton />
-        )}
-
-
+        {loading.profile && <SidebarSkeleton />}
         {!loading.profile && !error && (
-          <>
-            <ConversationList
-              items={userRooms}
-              type="room"
-              searchTerm={searchTerm}
-            />
-            <ConversationList
-              items={dmConversations}
-              type="dm"
-              searchTerm={searchTerm}
-            />
-          </>
+          <ConversationList
+            items={combinedAndSortedConversations}
+            searchTerm={searchTerm}
+          />
         )}
       </div>
     </div>

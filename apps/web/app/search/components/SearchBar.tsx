@@ -7,67 +7,20 @@ import { useAtom } from "jotai";
 import useDebounce from "../hooks/useDebounce";
 import SearchResults from "./SearchResults";
 import { userAtom } from "../store";
-import { API_BASE_URL } from '@/lib/constants'
-
-// --- Types ---
-// (You may want to move these to a shared types file)
-interface SearchUser {
-  id: number;
-  name: string;
-  username: string;
-  image: string | null;
-}
-interface SearchPost {
-  id: number;
-  content: string;
-  user: { username: string };
-}
-interface SearchGig {
-  id: number;
-  title: string;
-  createdBy: { username: string };
-}
-interface SearchRoom {
-  id: number;
-  name: string;
-  createdBy: { username: string };
-}
-
-export type SearchResult =
-  | { type: "user"; data: SearchUser }
-  | { type: "post"; data: SearchPost }
-  | { type: "gig"; data: SearchGig }
-  | { type: "room"; data: SearchRoom };
-// --- End Types ---
-
-// --- Debounce Hook ---
-// Create a new file: `hooks/useDebounce.ts`
-// import { useState, useEffect } from 'react';
-//
-// export default function useDebounce(value: string, delay: number) {
-//   const [debouncedValue, setDebouncedValue] = useState(value);
-//   useEffect(() => {
-//     const handler = setTimeout(() => {
-//       setDebouncedValue(value);
-//     }, delay);
-//     return () => {
-//       clearTimeout(handler);
-//     };
-//   }, [value, delay]);
-//   return debouncedValue;
-// }
-// --- End Hook ---
+import { API_BASE_URL } from "@/lib/constants";
+import { useRouter } from "next/navigation"; // Import useRouter
+import { SearchResult } from "@/lib/types"; // Import from main types file
 
 const fetchSearch = async (
   query: string,
-  userId: number | undefined,
-  followersOnly: boolean,
+  userId: string | undefined,
+  followersOnly: boolean
 ): Promise<SearchResult[]> => {
-  if (query.trim().length < 2) return []; // Don't search for less than 2 chars
+  if (query.trim().length < 2) return [];
   const res = await fetch(
     `${API_BASE_URL}/search?q=${encodeURIComponent(
-      query,
-    )}&userId=${userId}&followersOnly=${followersOnly}`,
+      query
+    )}&userId=${userId}&followersOnly=${followersOnly}`
   );
   if (!res.ok) throw new Error("Search failed");
   return res.json();
@@ -78,19 +31,19 @@ export default function SearchBar() {
   const [isFocused, setIsFocused] = useState(false);
   const [query, setQuery] = useState("");
   const [followersOnly, setFollowersOnly] = useState(false);
-  const debouncedQuery = useDebounce(query, 300); // 300ms debounce
+  const debouncedQuery = useDebounce(query, 300);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchBarRef = useRef<HTMLDivElement>(null);
+  const router = useRouter(); // Initialize router
 
   const { data: results, isLoading } = useQuery({
     queryKey: ["search", debouncedQuery, user?.id, followersOnly],
     queryFn: () => fetchSearch(debouncedQuery, user?.id, followersOnly),
-    enabled: debouncedQuery.length > 1, // Only fetch if query is long enough
+    enabled: debouncedQuery.length > 1,
   });
 
   const isExpanded = isFocused || query.length > 0;
 
-  // Handle clicking outside to close
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -109,10 +62,20 @@ export default function SearchBar() {
     };
   }, [query]);
 
+  // --- NEW: Handle Enter key press ---
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && query.trim().length > 0) {
+      e.preventDefault();
+      router.push(`/search?q=${encodeURIComponent(query)}`);
+      inputRef.current?.blur();
+      setIsFocused(false);
+    }
+  };
+
   return (
     <div
       ref={searchBarRef}
-      className="absolute top-3 right-4 mr-10 z-20" // z-20 to be above page content
+      className="absolute top-3 right-4 mr-10 z-20"
     >
       <div
         className={`relative flex items-center border rounded-full px-2 py-2 transition-all duration-300 overflow-visible
@@ -129,6 +92,7 @@ export default function SearchBar() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown} // Add keydown listener
           placeholder="Search..."
           onFocus={() => setIsFocused(true)}
           className="bg-transparent outline-none w-full placeholder:text-gray-400 text-black text-sm ml-1"
@@ -144,10 +108,8 @@ export default function SearchBar() {
         {isLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-500" />}
       </div>
 
-      {/* --- Search Results Dropdown --- */}
       {isExpanded && (query.length > 1 || results) && (
         <div className="absolute top-full mt-2 w-72">
-          {/* "Only Followers" Checkbox */}
           {user && (
             <div className="flex items-center p-2 bg-white rounded-t-lg border-b border-gray-200 shadow-xl">
               <input
@@ -166,7 +128,6 @@ export default function SearchBar() {
             </div>
           )}
 
-          {/* Results List */}
           <SearchResults
             results={results || []}
             isLoading={isLoading && debouncedQuery.length > 1}

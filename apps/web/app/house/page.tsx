@@ -1,5 +1,5 @@
-import Feedbox from "@components/HouseComponents/feedbox";
-import ProfilePage from "@components/profilePage";
+import Feedbox from "@housecomponents/feedbox";
+import ProfilePage from "@shared/profilePage";
 
 export default function House() {
   return (

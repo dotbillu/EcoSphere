@@ -14,11 +14,23 @@
       "@lib/*": [
         "./app/lib/*"
       ],
-      "@components/*": [
-        "./app/components/*"
+      "@shared/*": [
+        "./app/shared/*"
       ],
       "@hooks/*": [
         "./app/hooks/*"
+      ],
+      "@housecomponents/*": [
+        "./app/house/components/*"
+      ],
+      "@profilecomponents/*": [
+        "./app/profile/components/*"
+      ],
+      "@searchcomponents/*": [
+        "./app/search/components/*"
+      ],
+      "@mapcomponents/*": [
+        "./app/map/components/*"
       ]
     }
   },

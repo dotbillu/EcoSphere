@@ -4,7 +4,6 @@ import type { Router as ExpressRouter } from "express";
 
 const router: ExpressRouter = Router();
 
-// --- NEW: Global Search Endpoint (Upgraded) ---
 router.get("/", async (req, res) => {
   const {
     q: query,
@@ -24,7 +23,6 @@ router.get("/", async (req, res) => {
   let followedUserIds: string[] = [];
 
   if (isFollowersOnly && userIdStr) {
-    // Get the list of users the current user follows
     const user = await prisma.user.findUnique({
       where: { id: userIdStr },
       include: {
@@ -40,7 +38,6 @@ router.get("/", async (req, res) => {
   }
 
   try {
-    // 1. Find matching users
     const users = await prisma.user.findMany({
       where: {
         AND: [
@@ -50,10 +47,7 @@ router.get("/", async (req, res) => {
               { username: { contains: searchTerm, mode: "insensitive" } },
             ],
           },
-          // Apply follower filter if checked
-          isFollowersOnly
-            ? { id: { in: followedUserIds } }
-            : {},
+          isFollowersOnly ? { id: { in: followedUserIds } } : {},
         ],
       },
       take: 5,
@@ -65,14 +59,11 @@ router.get("/", async (req, res) => {
       },
     });
 
-    // 2. Find matching posts
     const posts = await prisma.post.findMany({
       where: {
         AND: [
           { content: { contains: searchTerm, mode: "insensitive" } },
-          isFollowersOnly
-            ? { username: { in: followedUsernames } }
-            : {},
+          isFollowersOnly ? { username: { in: followedUsernames } } : {},
         ],
       },
       take: 3,
@@ -82,7 +73,6 @@ router.get("/", async (req, res) => {
       },
     });
 
-    // 3. Find matching gigs
     const gigs = await prisma.gig.findMany({
       where: {
         AND: [
@@ -92,9 +82,7 @@ router.get("/", async (req, res) => {
               { description: { contains: searchTerm, mode: "insensitive" } },
             ],
           },
-          isFollowersOnly
-            ? { creatorId: { in: followedUserIds } }
-            : {},
+          isFollowersOnly ? { creatorId: { in: followedUserIds } } : {},
         ],
       },
       take: 3,
@@ -106,7 +94,6 @@ router.get("/", async (req, res) => {
       },
     });
 
-    // 4. Find matching rooms
     const rooms = await prisma.mapRoom.findMany({
       where: {
         AND: [
@@ -116,9 +103,7 @@ router.get("/", async (req, res) => {
               { description: { contains: searchTerm, mode: "insensitive" } },
             ],
           },
-          isFollowersOnly
-            ? { creatorId: { in: followedUserIds } }
-            : {},
+          isFollowersOnly ? { creatorId: { in: followedUserIds } } : {},
         ],
       },
       take: 3,
@@ -130,11 +115,10 @@ router.get("/", async (req, res) => {
       },
     });
 
-    // 5. Combine and format all items
     const allItems = [
       ...users.map((item) => ({
         type: "user" as const,
-        sortDate: new Date(), // Users don't have a date, put them at the top
+        sortDate: new Date(),
         data: item,
       })),
       ...posts.map((item) => ({
@@ -159,14 +143,131 @@ router.get("/", async (req, res) => {
       })),
     ];
 
-    // 6. Sort the combined list
     const topResults = allItems
       .sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime())
-      .slice(0, 5); // Get the top 5 results overall
+      .slice(0, 5);
 
     res.json(topResults);
   } catch (err) {
     console.error("Error in global search:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.get("/page", async (req, res) => {
+  const {
+    q: query,
+    tab = "all",
+    skip = "0",
+    take = "10",
+  } = req.query;
+
+  if (!query || typeof query !== "string" || query.trim().length === 0) {
+    return res.status(400).json({ message: "Search query 'q' is required" });
+  }
+
+  const searchTerm = query.trim();
+  const skipNum = parseInt(skip as string);
+  const takeNum = parseInt(take as string);
+  let results: any[] = [];
+  let nextSkip: number | null = null;
+
+  try {
+    if (tab === "all" || tab === "people") {
+      const users = await prisma.user.findMany({
+        where: {
+          OR: [
+            { name: { contains: searchTerm, mode: "insensitive" } },
+            { username: { contains: searchTerm, mode: "insensitive" } },
+          ],
+        },
+        skip: tab === "all" ? 0 : skipNum,
+        take: tab === "all" ? 5 : takeNum,
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          image: true,
+          posterImage: true,
+        },
+      });
+      results = [
+        ...results,
+        ...users.map((item) => ({ type: "user" as const, data: item })),
+      ];
+      if (tab === "people" && users.length === takeNum) {
+        nextSkip = skipNum + takeNum;
+      }
+    }
+
+    if (tab === "all" || tab === "gigs") {
+      const gigs = await prisma.gig.findMany({
+        where: {
+          OR: [
+            { title: { contains: searchTerm, mode: "insensitive" } },
+            { description: { contains: searchTerm, mode: "insensitive" } },
+          ],
+        },
+        skip: tab === "all" ? 0 : skipNum,
+        take: tab === "all" ? 5 : takeNum,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          createdAt: true,
+          createdBy: {
+            select: { id: true, name: true, username: true, image: true },
+          },
+          imageUrls: true,
+        },
+      });
+      results = [
+        ...results,
+        ...gigs.map((item) => ({ type: "gig" as const, data: item })),
+      ];
+      if (tab === "gigs" && gigs.length === takeNum) {
+        nextSkip = skipNum + takeNum;
+      }
+    }
+
+    if (tab === "all" || tab === "rooms") {
+      const rooms = await prisma.mapRoom.findMany({
+        where: {
+          OR: [
+            { name: { contains: searchTerm, mode: "insensitive" } },
+            { description: { contains: searchTerm, mode: "insensitive" } },
+          ],
+        },
+        skip: tab === "all" ? 0 : skipNum,
+        take: tab === "all" ? 5 : takeNum,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          createdAt: true,
+          createdBy: {
+            select: { id: true, name: true, username: true, image: true },
+          },
+          imageUrl: true,
+        },
+      });
+      results = [
+        ...results,
+        ...rooms.map((item) => ({ type: "room" as const, data: item })),
+      ];
+      if (tab === "rooms" && rooms.length === takeNum) {
+        nextSkip = skipNum + takeNum;
+      }
+    }
+
+    res.json({
+      results,
+      nextSkip,
+    });
+  } catch (err) {
+    console.error("Error in paginated search:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });

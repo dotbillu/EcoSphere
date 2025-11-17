@@ -7,7 +7,7 @@ import {
   userRoomsAtom,
   dmConversationsAtom,
   networkLoadingAtom,
-} from "../../store";
+} from "@/store";
 import { ChatMapRoom, SimpleUser } from "@lib/types";
 
 // The 'params' prop is now a Promise

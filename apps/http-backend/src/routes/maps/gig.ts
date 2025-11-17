@@ -103,7 +103,13 @@ router.post("/gig", upload.array("images", 5), async (req, res) => {
     };
 
     if (rId) {
-      data.room = { connect: { id: rId } };
+      const roomExists = await prisma.mapRoom.findUnique({
+        where: { id: rId },
+      });
+      if (!roomExists) {
+        return res.status(404).json({ message: "Linked room not found" });
+      }
+      data.roomId = rId;
     }
 
     const newGig = await prisma.gig.create({
@@ -165,10 +171,18 @@ router.put("/gig/:gigId", upload.array("images", 5), async (req, res) => {
     };
 
     if (roomId === null) {
-      data.room = { disconnect: true };
+      data.roomId = null;
     } else if (roomId !== undefined) {
       const rId = roomId;
-      if (rId) data.room = { connect: { id: rId } };
+      if (rId) {
+        const roomExists = await prisma.mapRoom.findUnique({
+          where: { id: rId },
+        });
+        if (!roomExists) {
+          return res.status(404).json({ message: "Linked room not found" });
+        }
+        data.roomId = rId;
+      }
     }
 
     const updatedGig = await prisma.gig.update({

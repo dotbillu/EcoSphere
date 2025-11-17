@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import Provider from "./Provider";
-import Navbar from "@components/Navbar";
+import Navbar from "@shared/Navbar";
 import "./globals.css";
 
 export default function RootLayout({

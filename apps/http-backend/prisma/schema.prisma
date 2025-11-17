@@ -8,27 +8,28 @@ generator client {
 }
 
 model User {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
-  username    String   @unique
-  email       String   @unique
+  username    String    @unique
+  email       String    @unique
   image       String?
   posterImage String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+  isOnline    Boolean   @default(false)
+  lastSeen    DateTime?
 
-  posts       Post[]    @relation("UserPosts")
-  rooms       MapRoom[] @relation("UserRooms")
-  mapRooms    MapRoom[] @relation("MapRoomCreator")
-  gigs        Gig[]     @relation("GigCreator")
-  followers   User[]    @relation("UserFollows")
-  following   User[]    @relation("UserFollows")
-  likes       Like[]    @relation("UserLikes")
-  comments    Comment[] @relation("UserComments")
-
+  posts       Post[]            @relation("UserPosts")
+  rooms       MapRoom[]         @relation("UserRooms")
+  mapRooms    MapRoom[]         @relation("MapRoomCreator")
+  gigs        Gig[]             @relation("GigCreator")
+  followers   User[]            @relation("UserFollows")
+  following   User[]            @relation("UserFollows")
+  likes       Like[]            @relation("UserLikes")
+  comments    Comment[]         @relation("UserComments")
   groupMessages GroupMessage[]  @relation("UserGroupMessages")
-  sentDMs       DirectMessage[] @relation("SentDMs")
-  receivedDMs   DirectMessage[] @relation("ReceivedDMs")
-  reactions     Reaction[]
+  sentDMs     DirectMessage[]   @relation("SentDMs")
+  receivedDMs DirectMessage[]   @relation("ReceivedDMs")
+  reactions   Reaction[]
 }
 
 model Post {
@@ -49,11 +50,11 @@ model Post {
 }
 
 model Like {
-  id   String @id @default(uuid())
-  post Post   @relation("PostLikes", fields: [postId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  post   Post   @relation("PostLikes", fields: [postId], references: [id], onDelete: Cascade)
   postId String
 
-  user   User   @relation("UserLikes", fields: [userId], references: [id], onDelete: Cascade)
+  user   User     @relation("UserLikes", fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   createdAt DateTime @default(now())
@@ -67,7 +68,7 @@ model Comment {
   post    Post   @relation("PostComments", fields: [postId], references: [id], onDelete: Cascade)
   postId  String
 
-  user   User   @relation("UserComments", fields: [userId], references: [id], onDelete: Cascade)
+  user   User     @relation("UserComments", fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   createdAt DateTime @default(now())
@@ -81,7 +82,7 @@ model MapRoom {
   longitude   Float
   createdAt   DateTime @default(now())
 
-  createdBy User   @relation("MapRoomCreator", fields: [creatorId], references: [id])
+  createdBy User     @relation("MapRoomCreator", fields: [creatorId], references: [id])
   creatorId String
 
   members  User[]   @relation("UserRooms")
@@ -104,7 +105,7 @@ model Gig {
   expiresAt   DateTime?
   createdAt   DateTime  @default(now())
 
-  createdBy User   @relation("GigCreator", fields: [creatorId], references: [id])
+  createdBy User     @relation("GigCreator", fields: [creatorId], references: [id])
   creatorId String
 
   room   MapRoom? @relation("RoomGigs", fields: [roomId], references: [id])
@@ -119,10 +120,10 @@ model GroupMessage {
   content   String
   createdAt DateTime @default(now())
 
-  sender   User   @relation("UserGroupMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  sender   User     @relation("UserGroupMessages", fields: [senderId], references: [id], onDelete: Cascade)
   senderId String
 
-  room   MapRoom @relation("RoomGroupMessages", fields: [roomId], references: [id], onDelete: Cascade)
+  room   MapRoom  @relation("RoomGroupMessages", fields: [roomId], references: [id], onDelete: Cascade)
   roomId String
 
   reactions Reaction[]
@@ -134,11 +135,12 @@ model DirectMessage {
   id        String   @id @default(uuid())
   content   String
   createdAt DateTime @default(now())
+  isRead    Boolean  @default(false)
 
-  sender   User   @relation("SentDMs", fields: [senderId], references: [id], onDelete: Cascade)
+  sender   User     @relation("SentDMs", fields: [senderId], references: [id], onDelete: Cascade)
   senderId String
 
-  recipient   User   @relation("ReceivedDMs", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipient   User     @relation("ReceivedDMs", fields: [recipientId], references: [id], onDelete: Cascade)
   recipientId String
 
   reactions Reaction[]
@@ -152,7 +154,7 @@ model Reaction {
   emoji     String
   createdAt DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   groupMessage   GroupMessage? @relation(fields: [groupMessageId], references: [id], onDelete: Cascade)

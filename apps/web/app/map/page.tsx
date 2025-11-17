@@ -1,9 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import SearchBar from "@components/SearchBar";
 
-const Map = dynamic(() => import("@components/MapComponents/MapComponent"), {
+const Map = dynamic(() => import("@mapcomponents/MapComponent"), {
   ssr: false,
   loading: () => (
     <div className="flex h-full w-full items-center justify-center">
@@ -15,9 +14,6 @@ const Map = dynamic(() => import("@components/MapComponents/MapComponent"), {
 export default function MapPage() {
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
-      <div className="relative z-10">
-        <SearchBar />
-      </div>
 
       <div className="w-full flex-1">
         <Map />

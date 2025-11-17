@@ -1,9 +1,14 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { useAtom, useSetAtom } from "jotai";
+import { useAtom, useSetAtom, atom } from "jotai";
 import { API_BASE_URL } from "@lib/constants";
-import { ChatUserProfile, SimpleUser } from "@lib/types";
+import {
+  ChatUserProfile,
+  SimpleUser,
+  MessageType,
+  Reaction,
+} from "@lib/types";
 import NetworkSidebar from "./components/NetworkSidebar";
 import ChatPanel from "./components/ChatPanel";
 import NewChatModal from "./components/NewChatModal";
@@ -16,7 +21,13 @@ import {
   networkLoadingAtom,
   networkErrorAtom,
   isNewChatModalOpenAtom,
+  messagesAtom,
+  selectedConversationAtom,
 } from "../store";
+import { io, Socket } from "socket.io-client";
+
+const WS_URL = "http://localhost:4001";
+export const socketAtom = atom<Socket | null>(null);
 
 export default function NetworkLayout({
   children,
@@ -24,13 +35,175 @@ export default function NetworkLayout({
   children: React.ReactNode;
 }) {
   const [currentUser] = useAtom(userAtom);
-  const setUserRooms = useSetAtom(userRoomsAtom);
+  const [userRooms, setUserRooms] = useAtom(userRoomsAtom);
   const setDmConversations = useSetAtom(dmConversationsAtom);
   const setFollowingList = useSetAtom(followingListAtom);
   const [isLoading] = useAtom(networkLoadingAtom);
   const setError = useSetAtom(networkErrorAtom);
   const setLoading = useSetAtom(networkLoadingAtom);
   const [isModalOpen] = useAtom(isNewChatModalOpenAtom);
+
+  const [socket, setSocket] = useAtom(socketAtom);
+  const setMessages = useSetAtom(messagesAtom);
+  const [selectedConversation] = useAtom(selectedConversationAtom);
+
+  useEffect(() => {
+    if (currentUser) {
+      const newSocket = io(WS_URL);
+      setSocket(newSocket);
+      return () => {
+        console.log("Disconnecting socket...");
+        newSocket.disconnect();
+        setSocket(null);
+      };
+    }
+  }, [currentUser, setSocket]);
+
+  useEffect(() => {
+    if (!socket || !currentUser) return;
+
+    console.log("Attaching listeners for socket:", socket.id);
+    socket.emit("authenticate", currentUser.id);
+
+    const handleDmConfirm = ({
+      tempId,
+      message,
+    }: {
+      tempId: string;
+      message: MessageType;
+    }) => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === tempId ? message : msg))
+      );
+    };
+
+    const handleDmReceive = (message: MessageType) => {
+      const isSelected =
+        selectedConversation?.type === "dm" &&
+        selectedConversation.data.id === message.senderId;
+
+      if (isSelected) {
+        setMessages((prev) => [...prev, message]);
+      }
+
+      setDmConversations((prev) =>
+        prev.map((convo) =>
+          convo.id === message.senderId
+            ? {
+                ...convo,
+                lastMessage: message.content,
+                lastMessageTimestamp: message.createdAt,
+                unseenCount: isSelected
+                  ? 0
+                  : (convo.unseenCount || 0) + 1,
+              }
+            : convo
+        )
+      );
+    };
+
+    const handleGroupReceive = ({
+      tempId,
+      message,
+    }: {
+      tempId: string;
+      message: MessageType;
+    }) => {
+      const isSelected =
+        selectedConversation?.type === "room" &&
+        selectedConversation.data.id === message.roomId;
+
+      if (message.senderId === currentUser.id) {
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === tempId ? message : msg))
+        );
+      } else if (isSelected) {
+        setMessages((prev) => [...prev, message]);
+      }
+
+      setUserRooms((prev) =>
+        prev.map((room) =>
+          room.id === message.roomId
+            ? {
+                ...room,
+                lastMessage: message.content,
+                lastMessageTimestamp: message.createdAt,
+                unseenCount:
+                  message.senderId !== currentUser.id && !isSelected
+                    ? (room.unseenCount || 0) + 1
+                    : room.unseenCount,
+              }
+            : room
+        )
+      );
+    };
+
+    const handleReactionUpdate = ({
+      action,
+      reaction,
+      messageId,
+    }: {
+      action: "added" | "removed";
+      reaction: Reaction;
+      messageId: string;
+    }) => {
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id !== messageId) return msg;
+          const newReactions =
+            action === "added"
+              ? [...msg.reactions, reaction]
+              : msg.reactions.filter((r) => r.id !== reaction.id);
+          return { ...msg, reactions: newReactions };
+        })
+      );
+    };
+
+    const handleMessageDeleted = (messageId: string) => {
+      setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+    };
+
+    const handleUserStatus = (user: SimpleUser) => {
+      setDmConversations((prev) =>
+        prev.map((convo) =>
+          convo.id === user.id
+            ? { ...convo, isOnline: user.isOnline, lastSeen: user.lastSeen }
+            : convo
+        )
+      );
+    };
+
+    socket.on("dm:confirm", handleDmConfirm);
+    socket.on("dm:receive", handleDmReceive);
+    socket.on("group:receive", handleGroupReceive);
+    socket.on("reaction:update", handleReactionUpdate);
+    socket.on("message:deleted", handleMessageDeleted);
+    socket.on("user:status", handleUserStatus);
+
+    return () => {
+      console.log("Detaching listeners for socket:", socket.id);
+      socket.off("dm:confirm", handleDmConfirm);
+      socket.off("dm:receive", handleDmReceive);
+      socket.off("group:receive", handleGroupReceive);
+      socket.off("reaction:update", handleReactionUpdate);
+      socket.off("message:deleted", handleMessageDeleted);
+      socket.off("user:status", handleUserStatus);
+    };
+  }, [
+    socket,
+    currentUser,
+    setMessages,
+    selectedConversation,
+    setDmConversations,
+    setUserRooms,
+  ]);
+
+  useEffect(() => {
+    if (socket && userRooms.length > 0) {
+      const roomIds = userRooms.map((room) => room.id);
+      socket.emit("join:rooms", roomIds);
+    }
+  }, [socket, userRooms]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -44,12 +217,13 @@ export default function NetworkLayout({
       setError(null);
       try {
         const res = await fetch(
-          `${API_BASE_URL}/user/profile/${currentUser.username}`,
+          `${API_BASE_URL}/user/profile/${currentUser.username}`
         );
         if (!res.ok) throw new Error("Failed to fetch user profile");
-
         const profile: ChatUserProfile = await res.json();
-        setUserRooms(profile.rooms || []);
+        setUserRooms(
+          profile.rooms?.map((room) => ({ ...room, unseenCount: 0 })) || []
+        );
         setFollowingList(profile.following || []);
       } catch (err: any) {
         setError(err.message);
@@ -60,14 +234,14 @@ export default function NetworkLayout({
 
     const fetchDmConversations = async () => {
       try {
-        // currentUser.id is a string (UUID)
         const res = await fetch(
-          `${API_BASE_URL}/chat/dm/conversations/${currentUser.id}`,
+          `${API_BASE_URL}/chat/dm/conversations/${currentUser.id}`
         );
         if (!res.ok) throw new Error("Failed to fetch DM conversations");
-
         const conversations: SimpleUser[] = await res.json();
-        setDmConversations(conversations);
+        setDmConversations(
+          conversations.map((convo) => ({ ...convo, unseenCount: 0 }))
+        );
       } catch (err: any) {
         setError(err.message);
       }
@@ -85,8 +259,6 @@ export default function NetworkLayout({
   ]);
 
   if (!currentUser && !isLoading.profile) {
-    // This logic seems incorrect. If !currentUser, it should not attempt to load.
-    // However, keeping the original structure but updating the text logic:
     return (
       <div className="flex h-full w-full items-center justify-center bg-black text-gray-400">
         <div className="text-center">

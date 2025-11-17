@@ -1,8 +1,47 @@
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 import { API_BASE_URL } from "./constants";
 
-// Helper function to build image URLs
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
 export const getImageUrl = (path: string | null | undefined) => {
   if (!path) return "/default-placeholder.png";
-  if (path.startsWith("http")) return path;
+  if (path.startsWith("http") || path.startsWith("blob:")) return path;
   return `${API_BASE_URL}/uploads/${path}`;
 };
+
+export function getHaversineDistanceInMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  return distance;
+}
+
+export function haversineDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): string {
+  const distanceInMeters = getHaversineDistanceInMeters(lat1, lon1, lat2, lon2);
+
+  if (distanceInMeters < 1000) {
+    return `${distanceInMeters.toFixed(0)} m away`;
+  }
+  return `${(distanceInMeters / 1000).toFixed(1)} km away`;
+}
