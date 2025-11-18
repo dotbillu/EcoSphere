@@ -11,18 +11,23 @@ import {
   Heart,
   MessageCircle,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getImageUrl } from "../../lib/utils";
-import { Post } from "../../store";
+import { getImageUrl } from "@/lib/utils";
+import { Post, UserProfile } from "@/store";
+import Avatar from "../ui/Avatar";
+
+const LinkComp = Link as React.ElementType;
+const ImageComp = Image as React.ElementType;
 
 interface PostEntryProps {
   post: Post;
   currentUserId?: string;
+  loggedInUser?: UserProfile;
   onLikeToggle: (postId: string) => void;
   onNavigate: (postId: string) => void;
   onPrefetchProfile: (username: string) => void;
   onPrefetchPost: (postId: string) => void;
+  onFollowToggle: (username: string) => void;
 }
 
 const PostEntry = React.forwardRef<
@@ -40,7 +45,6 @@ const PostEntry = React.forwardRef<
     },
     ref,
   ) => {
-    const router = useRouter();
     const [isExpanded, setIsExpanded] = useState(false);
     const [needsTruncation, setNeedsTruncation] = useState(false);
     const contentRef = useRef<HTMLParagraphElement>(null);
@@ -48,7 +52,7 @@ const PostEntry = React.forwardRef<
     const [modalImageIndex, setModalImageIndex] = useState(0);
 
     const isLikedByCurrentUser = post.likes.some(
-      (like) => like.userId === currentUserId,
+      (like) => String(like.userId) === String(currentUserId),
     );
 
     useEffect(() => {
@@ -66,118 +70,89 @@ const PostEntry = React.forwardRef<
       setModalImageIndex(index);
       setIsModalOpen(true);
     };
+
     const closeModal = (e?: React.MouseEvent) => {
       e?.stopPropagation();
       setIsModalOpen(false);
     };
-    const showNextImage = (e: React.MouseEvent) => {
+
+    const navigateImage = (e: React.MouseEvent, dir: "next" | "prev") => {
       e.stopPropagation();
-      setModalImageIndex((prev) =>
-        prev < post.imageUrls.length - 1 ? prev + 1 : 0,
-      );
-    };
-    const showPrevImage = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setModalImageIndex((prev) =>
-        prev > 0 ? prev - 1 : post.imageUrls.length - 1,
-      );
+      setModalImageIndex((prev) => {
+        if (dir === "next")
+          return prev < post.imageUrls.length - 1 ? prev + 1 : 0;
+        return prev > 0 ? prev - 1 : post.imageUrls.length - 1;
+      });
     };
 
     const renderImageGrid = () => {
       const count = post.imageUrls.length;
       if (count === 0) return null;
       const gridBase =
-        "relative w-full max-w-xl h-80 rounded-2xl overflow-hidden mt-3 border border-zinc-700";
-      if (count === 1) {
+        "relative w-full h-80 rounded-xl overflow-hidden mt-3 border border-zinc-800";
+
+      const ImageItem = ({
+        url,
+        idx,
+        className = "",
+      }: {
+        url: string;
+        idx: number;
+        className?: string;
+      }) => (
+        <div
+          className={`relative h-full cursor-pointer ${className}`}
+          onClick={(e) => openModal(e, idx)}
+        >
+          <ImageComp
+            src={getImageUrl(url)}
+            alt="Post content"
+            fill
+            className="object-cover"
+          />
+        </div>
+      );
+
+      if (count === 1)
         return (
-          <div
-            className={`${gridBase} cursor-pointer`}
-            onClick={(e) => openModal(e, 0)}
-          >
-            <Image
-              src={getImageUrl(post.imageUrls[0])}
-              alt="Post image"
-              fill
-              style={{ objectFit: "cover" }}
-            />
+          <div className={gridBase}>
+            <ImageItem url={post.imageUrls[0]} idx={0} />
           </div>
         );
-      }
-      if (count === 2) {
+      if (count === 2)
         return (
           <div className={`${gridBase} grid grid-cols-2 gap-0.5`}>
-            {post.imageUrls.map((url, index) => (
-              <div
-                key={index}
-                className="relative h-full cursor-pointer"
-                onClick={(e) => openModal(e, index)}
-              >
-                <Image
-                  src={getImageUrl(url)}
-                  alt={`Post image ${index + 1}`}
-                  fill
-                  style={{ objectFit: "cover" }}
-                />
-              </div>
-            ))}
+            <ImageItem url={post.imageUrls[0]} idx={0} />
+            <ImageItem url={post.imageUrls[1]} idx={1} />
           </div>
         );
-      }
-      if (count === 3) {
+      if (count === 3)
         return (
           <div className={`${gridBase} grid grid-cols-2 grid-rows-2 gap-0.5`}>
-            <div
-              className="relative row-span-2 cursor-pointer"
-              onClick={(e) => openModal(e, 0)}
-            >
-              <Image
-                src={getImageUrl(post.imageUrls[0])}
-                alt="Post image 1"
-                fill
-                style={{ objectFit: "cover" }}
-              />
+            <div className="row-span-2">
+              <ImageItem url={post.imageUrls[0]} idx={0} />
             </div>
-            <div
-              className="relative col-start-2 cursor-pointer"
-              onClick={(e) => openModal(e, 1)}
-            >
-              <Image
-                src={getImageUrl(post.imageUrls[1])}
-                alt="Post image 2"
-                fill
-                style={{ objectFit: "cover" }}
-              />
-            </div>
-            <div
-              className="relative col-start-2 row-start-2 cursor-pointer"
-              onClick={(e) => openModal(e, 2)}
-            >
-              <Image
-                src={getImageUrl(post.imageUrls[2])}
-                alt="Post image 3"
-                fill
-                style={{ objectFit: "cover" }}
-              />
-            </div>
+            <ImageItem url={post.imageUrls[1]} idx={1} />
+            <ImageItem url={post.imageUrls[2]} idx={2} />
           </div>
         );
-      }
+
       return (
         <div className={`${gridBase} grid grid-cols-2 grid-rows-2 gap-0.5`}>
-          {post.imageUrls.slice(0, 4).map((url, index) => (
+          {post.imageUrls.slice(0, 4).map((url, i) => (
             <div
-              key={index}
+              key={i}
               className="relative h-full cursor-pointer"
-              onClick={(e) => openModal(e, index)}
+              onClick={(e) => openModal(e, i)}
             >
-              <Image
+              <ImageComp
                 src={getImageUrl(url)}
-                alt={`Post image ${index + 1}`}
+                alt=""
                 fill
-                style={{ objectFit: "cover" }}
+                className="object-cover"
               />
-              {count > 4 && index === 3 && (
-                <div className="absolute inset-0 bg-black flex items-center justify-center text-white text-2xl font-bold">
+              {count > 4 && i === 3 && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-2xl font-bold">
                   +{count - 4}
                 </div>
               )}
@@ -192,32 +167,17 @@ const PostEntry = React.forwardRef<
         ref={ref}
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 15 }}
-        onClick={() => onNavigate(post.id)}
+        onClick={() => onNavigate(String(post.id))}
         onViewportEnter={() => {
           onPrefetchProfile(post.username);
-          onPrefetchPost(post.id);
-          router.prefetch(`/profile/${post.username}`);
-          router.prefetch(`/post/${post.id}`);
+          onPrefetchPost(String(post.id));
         }}
-        className="flex space-x-3 p-4 border-b border-zinc-700 cursor-pointer hover:bg-zinc-900/50 transition-colors duration-200"
+        className="flex space-x-3 p-4 border-b border-zinc-700 cursor-pointer hover:bg-zinc-900/30 transition-colors"
       >
-        <div className="flex-shrink-0" onClick={stopPropagation}>
-          <Link href={`/profile/${post.username}`}>
-            {post.user?.image ? (
-              <Image
-                src={getImageUrl(post.user.image)}
-                alt={post.username}
-                width={40}
-                height={40}
-                className="rounded-full object-cover w-10 h-10"
-              />
-            ) : (
-              <div className="bg-neutral-focus text-neutral-content rounded-full w-10 h-10 flex items-center justify-center">
-                {post.username[0].toUpperCase()}
-              </div>
-            )}
-          </Link>
+        <div onClick={stopPropagation} className="flex-shrink-0">
+          <LinkComp href={`/profile/${post.username}`}>
+            <Avatar src={post.user?.image} name={post.username} size={40} />
+          </LinkComp>
         </div>
 
         <div className="flex-1 min-w-0">
@@ -226,136 +186,128 @@ const PostEntry = React.forwardRef<
               className="flex items-center gap-2 flex-wrap"
               onClick={stopPropagation}
             >
-              <Link
+              <LinkComp
                 href={`/profile/${post.username}`}
-                className="text-white font-bold hover:underline"
-                onMouseEnter={() => {
-                  onPrefetchProfile(post.username);
-                  router.prefetch(`/profile/${post.username}`);
-                }}
+                className="text-white font-bold hover:underline text-[15px]"
+                onMouseEnter={() => onPrefetchProfile(post.username)}
               >
                 {post.name || post.username}
-              </Link>
-              <Link
+              </LinkComp>
+              <LinkComp
                 href={`/profile/${post.username}`}
-                className="text-zinc-400 hover:underline"
-                onMouseEnter={() => {
-                  onPrefetchProfile(post.username);
-                  router.prefetch(`/profile/${post.username}`);
-                }}
+                className="text-zinc-500 hover:underline text-sm"
               >
                 @{post.username}
-              </Link>
-              <p className="text-zinc-500 text-sm">
-                · {new Date(post.createdAt).toLocaleDateString()}
-              </p>
+              </LinkComp>
+              <span className="text-zinc-600 text-sm">·</span>
+              <span className="text-zinc-500 text-sm hover:underline">
+                {new Date(post.createdAt).toLocaleDateString()}
+              </span>
             </div>
-
             {post.location && (
-              <p className="text-zinc-400 text-sm flex items-center gap-1 flex-shrink-0 ml-2">
-                <MapPin size={16} />
+              <div className="text-zinc-500 text-xs flex items-center gap-1 ml-auto">
+                <MapPin size={12} />
                 {post.location}
-              </p>
+              </div>
             )}
           </div>
 
           <p
             ref={contentRef}
-            className={`text-white mt-1 whitespace-pre-wrap break-words ${
-              !isExpanded ? "line-clamp-8" : ""
+            className={`text-zinc-100 mt-1 whitespace-pre-wrap break-words text-[15px] leading-normal ${
+              !isExpanded ? "line-clamp-[8]" : ""
             }`}
           >
             {post.content}
           </p>
-
           {(needsTruncation || isExpanded) && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setIsExpanded((prev) => !prev);
+                setIsExpanded(!isExpanded);
               }}
-              className="text-blue-500 hover:underline mt-2 text-sm font-medium"
+              className="text-blue-500 hover:underline mt-2 text-sm"
             >
-      
               {isExpanded ? "Show less" : "Show more"}
             </button>
           )}
 
           {renderImageGrid()}
 
-          <div className="flex items-center gap-6 mt-4 text-zinc-500">
+          <div className="flex items-center justify-between mt-3 max-w-md">
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onLikeToggle(post.id);
+                onNavigate(String(post.id));
               }}
-              disabled={!currentUserId}
-              className={`flex items-center gap-1.5 transition-colors duration-200 group ${
-                isLikedByCurrentUser ? "text-red-500" : "hover:text-red-500"
-              } ${!currentUserId ? "opacity-50" : ""}`}
+              className="flex items-center gap-2 text-zinc-500 hover:text-blue-500 transition-colors group"
             >
-              <Heart
-                size={18}
-                fill={isLikedByCurrentUser ? "currentColor" : "none"}
-                className="group-hover:scale-110 transition-transform"
-              />
-              <span className="text-sm">{post._count.likes}</span>
+              <div className="p-2 rounded-full group-hover:bg-blue-500/10 transition-colors">
+                <MessageCircle size={18} />
+              </div>
+              <span className="text-sm">{post._count.comments}</span>
             </button>
 
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onNavigate(post.id);
+                onLikeToggle(String(post.id));
               }}
-              onMouseEnter={() => {
-                onPrefetchPost(post.id);
-                router.prefetch(`/post/${post.id}`);
-              }}
-              className="flex items-center gap-1.5 hover:text-blue-500 transition-colors duration-200 group"
+              disabled={!currentUserId}
+              className={`flex items-center gap-2 transition-colors group ${
+                isLikedByCurrentUser
+                  ? "text-pink-600"
+                  : "text-zinc-500 hover:text-pink-600"
+              }`}
             >
-              <MessageCircle
-                size={18}
-                className="group-hover:scale-110 transition-transform"
-              />
-              <span className="text-sm">{post._count.comments}</span>
+              <div className="p-2 rounded-full group-hover:bg-pink-600/10 transition-colors">
+                <Heart
+                  size={18}
+                  fill={isLikedByCurrentUser ? "currentColor" : "none"}
+                />
+              </div>
+              <span className="text-sm">{post._count.likes}</span>
             </button>
           </div>
         </div>
 
         {isModalOpen && (
           <div
-            className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
+            className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center"
             onClick={closeModal}
           >
             <button
-              className="absolute top-4 right-4 text-white z-[60] p-2"
+              className="absolute top-4 left-4 text-white p-2 bg-zinc-800 rounded-full"
               onClick={closeModal}
             >
-              <X size={32} />
+              <X size={24} />
             </button>
-            {post.imageUrls.length > 1 && (
-              <button
-                className="absolute left-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
-                onClick={showPrevImage}
-              >
-                <ChevronLeft size={32} />
-              </button>
-            )}
-            <div className="relative w-[90vw] h-[90vh]" onClick={stopPropagation}>
-              <Image
+            <div
+              className="relative w-full h-full max-w-7xl max-h-[90vh] p-4"
+              onClick={stopPropagation}
+            >
+              <ImageComp
                 src={getImageUrl(post.imageUrls[modalImageIndex])}
-                alt="Post image expanded"
+                alt="Expanded"
                 fill
-                style={{ objectFit: "contain" }}
+                className="object-contain"
               />
             </div>
             {post.imageUrls.length > 1 && (
-              <button
-                className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
-                onClick={showNextImage}
-              >
-                <ChevronRight size={32} />
-              </button>
+              <>
+                <button
+                  className="absolute left-4 text-white p-2 bg-zinc-800/50 rounded-full hover:bg-zinc-700"
+                  onClick={(e) => navigateImage(e, "prev")}
+                >
+                  <ChevronLeft size={32} />
+                </button>
+                <button
+                  className="absolute right-4 text-white p-2 bg-zinc-800/50 rounded-full hover:bg-zinc-700"
+                  onClick={(e) => navigateImage(e, "next")}
+                >
+                  <ChevronRight size={32} />
+                </button>
+              </>
             )}
           </div>
         )}
@@ -364,5 +316,4 @@ const PostEntry = React.forwardRef<
   },
 );
 PostEntry.displayName = "PostEntry";
-
 export default PostEntry;

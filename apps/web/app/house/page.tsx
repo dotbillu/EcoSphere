@@ -1,15 +1,9 @@
-import Feedbox from "@housecomponents/feedbox";
-import ProfilePage from "@shared/profilePage";
+import Feedbox from "./components/FeedBox";
 
-export default function House() {
+export default function FeedPage() {
   return (
-    <>
-      <div className="z-[999] relative ">
-        <ProfilePage />
-      </div>
-      <div className="w-full bg-black">
-        <Feedbox />
-      </div>
-    </>
+    <main className="flex justify-center bg-black min-h-screen text-white">
+      <Feedbox />
+    </main>
   );
 }
