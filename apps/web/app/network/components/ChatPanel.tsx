@@ -91,7 +91,7 @@ const ChatPanel: React.FC = () => {
   // 2. Load Messages
   useEffect(() => {
     if (!isSwitching && fetchedMessages) {
-      setMessages(fetchedMessages);
+      setMessages([...fetchedMessages].reverse());
     }
   }, [fetchedMessages, setMessages, isSwitching]);
 

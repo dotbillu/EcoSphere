@@ -8,7 +8,7 @@ import { useAtom } from "jotai";
 import { socketAtom } from "../layout";
 import { selectedConversationAtom, userAtom } from "@/store";
 
-const INITIAL_WIDTH = 800;
+const INITIAL_WIDTH = 1000;
 const MAX_WIDTH_PERCENTAGE = 1;
 const PADDING_AND_BUTTONS = 100;
 

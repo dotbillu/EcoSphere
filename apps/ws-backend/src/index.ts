@@ -1,7 +1,7 @@
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import { PrismaClient } from "@prisma/client";
-
+require('dotenv').config();
 const prisma = new PrismaClient();
 const httpServer = createServer();
 
@@ -12,7 +12,7 @@ const io = new Server(httpServer, {
   },
 });
 
-const PORT = 4001;
+const PORT = process.env.WS_PORT;
 
 const senderSelect = {
   id: true,

@@ -89,7 +89,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             px-3 py-2 rounded-2xl shadow-sm relative
             ${isMe
               ? 'bg-indigo-600 text-white rounded-br-lg'
-              : 'bg-gray-700 text-gray-200 rounded-bl-lg'
+              : 'bg-[#262626] text-gray-200 rounded-bl-lg'
             }
           `}
         >

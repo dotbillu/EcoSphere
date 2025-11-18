@@ -2,7 +2,7 @@
 
 import React, { useEffect } from "react";
 import { useAtom, useSetAtom, atom } from "jotai";
-import { API_BASE_URL } from "@/lib/constants"; // Fixed import path if needed
+import { API_BASE_URL, WS_BASE_URL } from "@/lib/constants"; // Fixed import path if needed
 import { ChatUserProfile, SimpleUser, MessageType, Reaction } from "@/lib/types"; // Fixed import path
 import NetworkSidebar from "./components/NetworkSidebar";
 import NewChatModal from "./components/NewChatModal";
@@ -22,7 +22,6 @@ import { io, Socket } from "socket.io-client";
 // Navbar is NOT needed here because it is already in RootLayout
 // import Navbar from "@/shared/Navbar"; 
 
-const WS_URL = "http://localhost:4001";
 export const socketAtom = atom<Socket | null>(null);
 
 export default function NetworkLayout({
@@ -46,7 +45,7 @@ export default function NetworkLayout({
   // --- Socket Connection & Logic ---
   useEffect(() => {
     if (currentUser) {
-      const newSocket = io(WS_URL);
+      const newSocket = io(WS_BASE_URL);
       setSocket(newSocket);
       return () => {
         newSocket.disconnect();
