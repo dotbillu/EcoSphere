@@ -1,6 +1,7 @@
 "use client";
 
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { useInfiniteQuery, InfiniteData } from '@tanstack/react-query';
 import { MessageType, SelectedConversation } from '@lib/types';
 import { API_BASE_URL } from '@lib/constants';
 import { useAtom } from 'jotai';
@@ -13,15 +14,17 @@ const fetchMessages = async ({ pageParam = 0, queryKey }: any) => {
   const { type, id, currentUserId } = conversation;
 
   let url = "";
+  
   if (type === "room") {
-    // FIX: Remove the redundant '/room' prefix to match the backend routing structure
-    url = `${API_BASE_URL}/chat/${id}/messages?skip=${pageParam}&take=${MESSAGES_PER_PAGE}`;
+    url = `${API_BASE_URL}/chat/room/${id}/messages?skip=${pageParam}&take=${MESSAGES_PER_PAGE}`;
   } else {
     url = `${API_BASE_URL}/chat/dm/${id}?currentUserId=${currentUserId}&skip=${pageParam}&take=${MESSAGES_PER_PAGE}`;
   }
 
   const res = await fetch(url);
-  if (!res.ok) throw new Error("Failed to fetch messages");
+  if (!res.ok) {
+    throw new Error("Failed to fetch messages");
+  }
 
   const messages: MessageType[] = await res.json();
   return messages;
@@ -30,22 +33,28 @@ const fetchMessages = async ({ pageParam = 0, queryKey }: any) => {
 export const useChatMessages = (conversation: SelectedConversation) => {
   const [currentUser] = useAtom(userAtom);
 
-  const queryKey = conversation
-    ? ['chat', { type: conversation.type, id: conversation.data.id, currentUserId: currentUser?.id }]
-    : null;
+  const selectMessages = useCallback((data: InfiniteData<MessageType[]>) => {
+    return data.pages.flat(); 
+  }, []);
+
+  const queryKey = conversation && currentUser
+    ? ['chat', { type: conversation.type, id: conversation.data.id, currentUserId: currentUser.id }]
+    : ['chat', 'idle'];
 
   return useInfiniteQuery({
     queryKey: queryKey,
     queryFn: fetchMessages,
+    initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
-      if (lastPage.length < MESSAGES_PER_PAGE) {
+      if (!lastPage || lastPage.length < MESSAGES_PER_PAGE) {
         return undefined;
       }
       return allPages.flat().length;
     },
     enabled: !!conversation && !!currentUser,
-    staleTime: 1000 * 60 * 5,
-
-    select: (data) => data.pages.flat().reverse(),
+    staleTime: 0,
+    // FIX: Removed placeholderData. 
+    // This forces the UI to clear the old chat and show "Loading..." immediately upon switch.
+    select: selectMessages, 
   });
 };

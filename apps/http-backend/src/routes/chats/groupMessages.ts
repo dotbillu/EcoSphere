@@ -29,18 +29,24 @@ router.get("/:roomId/messages", async (req, res) => {
       skip,
       take,
       include: {
-        sender: { select: senderSelect },
-        reactions: { select: reactionSelect },
+        sender: {
+          select: { id: true, username: true, name: true, image: true }
+        },
+        reactions: {
+          select: {
+            id: true,
+            emoji: true,
+            user: { select: { id: true, username: true, name: true } }
+          }
+        },
       },
     });
-
-    res.json(messages.reverse()); // Keep .reverse() for chronological order on frontend
+    res.json(messages);
   } catch (err) {
-    console.error("Error fetching group messages:", err);
-    res.status(500).json({ message: "Internal server error" });
+    console.error(err);
+    res.status(500).json({ message: "Error fetching group messages" });
   }
 });
-
 // --- POST route (REMOVED) ---
 // This logic is now handled by the ws-backend via 'group:send' event
 

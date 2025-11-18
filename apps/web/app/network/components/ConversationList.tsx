@@ -22,9 +22,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
   items,
   searchTerm,
 }) => {
-  const [selectedConversation, setSelectedConversation] = useAtom(
-    selectedConversationAtom
-  );
+  const [selectedConversation] = useAtom(selectedConversationAtom);
   const setUserRooms = useSetAtom(userRoomsAtom);
   const setDmConversations = useSetAtom(dmConversationsAtom);
   const router = useRouter();
@@ -34,37 +32,30 @@ const ConversationList: React.FC<ConversationListProps> = ({
   );
 
   const handleSelect = (item: ConversationItemType) => {
-    const data = { type: item.type, data: item as any };
-
+    // 1. Clear Notification Badge immediately (UI feedback)
     if (item.unseenCount && item.unseenCount > 0) {
-      const setter =
-        item.type === "room" ? setUserRooms : setDmConversations;
+      const setter = item.type === "room" ? setUserRooms : setDmConversations;
       setter((prev: any) =>
-        prev.map((i: any) =>
-          i.id === item.id ? { ...i, unseenCount: 0 } : i
-        )
+        prev.map((i: any) => (i.id === item.id ? { ...i, unseenCount: 0 } : i))
       );
     }
 
-    if (
-      selectedConversation?.type === item.type &&
-      selectedConversation?.data.id === item.id
-    ) {
+    // 2. CRITICAL FIX: Do NOT set selectedConversation or messages here.
+    // Just navigate. Let the [id]/page.tsx handle the state synchronization.
+    // This prevents the "Double Render" (State Update -> Router Update -> Component Remount).
+    if (selectedConversation?.data.id !== item.id) {
       router.push(`/network/${item.id}`);
-      return;
     }
-    setSelectedConversation(data);
-    router.push(`/network/${item.id}`);
   };
 
   if (filteredItems.length === 0 && searchTerm) {
     return (
-      <div className="p-4 text-center text-zinc-400">No results found.</div>
+      <div className="p-4 text-center text-zinc-500 text-sm">No results found.</div>
     );
   }
 
   return (
-    <nav className="px-4 rounded-2xl">
+    <nav className="px-2 pb-2">
       {filteredItems.map((item) => (
         <ConversationItem
           key={item.id}

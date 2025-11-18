@@ -20,38 +20,37 @@ const reactionSelect = {
 router.get("/:otherUserId", async (req, res) => {
   const { otherUserId } = req.params;
   const { currentUserId, skip, take } = req.query;
-
-  if (!currentUserId) {
-    return res.status(400).json({ message: "currentUserId is required" });
-  }
+  
+  if (!currentUserId) return res.status(400).json({ message: "Missing currentUserId" });
 
   try {
     const messages = await prisma.directMessage.findMany({
       where: {
         OR: [
-          {
-            senderId: currentUserId as string,
-            recipientId: otherUserId,
-          },
-          {
-            senderId: otherUserId,
-            recipientId: currentUserId as string,
-          },
+          { senderId: currentUserId as string, recipientId: otherUserId },
+          { senderId: otherUserId, recipientId: currentUserId as string },
         ],
       },
       orderBy: { createdAt: "desc" },
       skip: parseInt(skip as string) || 0,
-      take: parseInt(take as string) || 10,
+      take: parseInt(take as string) || 30,
       include: {
-        sender: { select: senderSelect },
-        reactions: { select: reactionSelect },
+        sender: {
+          select: { id: true, username: true, name: true, image: true }
+        },
+        reactions: {
+          select: {
+            id: true,
+            emoji: true,
+            user: { select: { id: true, username: true, name: true } }
+          }
+        },
       },
     });
-
     res.json(messages);
   } catch (err) {
-    console.error("Error fetching DM:", err);
-    res.status(500).json({ message: "Internal server error" });
+    console.error(err);
+    res.status(500).json({ message: "Error fetching DMs" });
   }
 });
 

@@ -1,15 +1,16 @@
 "use client";
 import Image from "next/image";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useLayoutEffect } from "react";
 import Link from "next/link";
 import { useAtom } from "jotai";
+import { useRouter } from "next/navigation";
 import {
   selectedConversationAtom,
   messagesAtom,
   networkErrorAtom,
   userAtom,
 } from "@/store";
-import { MessageSquare, Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import {
   MessageType,
   DirectMessage,
@@ -32,12 +33,11 @@ function formatLastSeen(lastSeen: string | null | undefined): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
   if (minutes < 1) return "Last seen just now";
   if (minutes < 60) return `Last seen ${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
   if (hours < 24) return `Last seen ${hours}h ago`;
+  const days = Math.floor(hours / 24);
   if (days === 1) return "Last seen yesterday";
   return `Last seen ${days}d ago`;
 }
@@ -49,13 +49,20 @@ interface TypingUser {
 
 const ChatPanel: React.FC = () => {
   const [currentUser] = useAtom(userAtom);
-  const [selectedConversation, setSelectedConversation] = useAtom(
-    selectedConversationAtom
-  );
+  const [selectedConversation, setSelectedConversation] = useAtom(selectedConversationAtom);
   const [messages, setMessages] = useAtom(messagesAtom);
   const [error, setError] = useAtom(networkErrorAtom);
   const [socket] = useAtom(socketAtom);
   const [typingUser, setTypingUser] = useState<TypingUser | null>(null);
+  
+  // This is purely for local UI logic to prevent flicker
+  const [isSwitching, setIsSwitching] = useState(false);
+  
+  const router = useRouter();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const oldScrollHeightRef = useRef(0);
+  const isInitialLoad = useRef(true);
 
   const {
     data: fetchedMessages,
@@ -66,76 +73,76 @@ const ChatPanel: React.FC = () => {
     isError,
   } = useChatMessages(selectedConversation);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const oldScrollHeightRef = useRef(0);
+  // 1. FORCE BLACK SCREEN ON CHANGE
+  // This runs synchronously after render when selectedConversation changes
+  useLayoutEffect(() => {
+    if (selectedConversation?.data.id) {
+        setIsSwitching(true);
+        // The atom is already cleared in ConversationList, but we enforce visual state here
+        // Short timeout to allow React Query to start fetching
+        const t = setTimeout(() => {
+            setIsSwitching(false);
+            isInitialLoad.current = true;
+        }, 50); 
+        return () => clearTimeout(t);
+    }
+  }, [selectedConversation?.data.id]);
+
+  // 2. Load Messages
+  useEffect(() => {
+    if (!isSwitching && fetchedMessages) {
+      setMessages(fetchedMessages);
+    }
+  }, [fetchedMessages, setMessages, isSwitching]);
 
   useEffect(() => {
-    if (fetchedMessages) setMessages([...fetchedMessages].reverse());
-    else setMessages([]);
-  }, [fetchedMessages, setMessages]);
+    setTypingUser(null);
+  }, [selectedConversation?.data.id]);
 
   useEffect(() => {
     if (isError) setError("Failed to fetch messages");
     else setError(null);
   }, [isError, setError]);
 
-  useEffect(() => {
-    if (!scrollContainerRef.current) return;
+  useLayoutEffect(() => {
+    if (isSwitching || !scrollContainerRef.current) return;
+
     if (oldScrollHeightRef.current > 0 && !isLoadingMore) {
       const newScrollHeight = scrollContainerRef.current.scrollHeight;
-      scrollContainerRef.current.scrollTop =
-        newScrollHeight - oldScrollHeightRef.current;
+      scrollContainerRef.current.scrollTop = newScrollHeight - oldScrollHeightRef.current;
       oldScrollHeightRef.current = 0;
-    } else if (
-      oldScrollHeightRef.current === 0 &&
-      !isLoadingMessages &&
-      fetchedMessages
-    ) {
-      setTimeout(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTop =
-            scrollContainerRef.current.scrollHeight;
+      return;
+    }
+
+    if (!isLoadingMessages && messages.length > 0) {
+      if (isInitialLoad.current) {
+        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        isInitialLoad.current = false;
+      } else {
+        const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
+        if (isNearBottom) {
+           messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         }
-      }, 50);
+      }
     }
-  }, [isLoadingMessages, isLoadingMore, fetchedMessages, setMessages]);
+  }, [isLoadingMessages, isLoadingMore, messages, isSwitching]);
 
-  useEffect(() => {
-    if (messages.length > 0 && messagesEndRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages.length]);
-
-  // --- Listen for typing events ---
   useEffect(() => {
     if (!socket) return;
-
     const handleUserTyping = (data: TypingUser) => {
-      if (data.conversationId === selectedConversation?.data.id) {
-        setTypingUser(data);
-      }
+      if (data.conversationId === selectedConversation?.data.id) setTypingUser(data);
     };
-
     const handleUserStoppedTyping = (data: { conversationId: string }) => {
-      if (data.conversationId === selectedConversation?.data.id) {
-        setTypingUser(null);
-      }
+      if (data.conversationId === selectedConversation?.data.id) setTypingUser(null);
     };
-
     socket.on("user:typing", handleUserTyping);
     socket.on("user:stopped-typing", handleUserStoppedTyping);
-
     return () => {
       socket.off("user:typing", handleUserTyping);
       socket.off("user:stopped-typing", handleUserStoppedTyping);
     };
   }, [socket, selectedConversation]);
-
-  // Reset typing indicator if chat changes
-  useEffect(() => {
-    setTypingUser(null);
-  }, [selectedConversation]);
 
   const fetchMoreMessages = () => {
     if (isLoadingMore || !hasNextPage || !scrollContainerRef.current) return;
@@ -144,40 +151,21 @@ const ChatPanel: React.FC = () => {
   };
 
   const handleScroll = () => {
-    if (
-      scrollContainerRef.current &&
-      scrollContainerRef.current.scrollTop < SCROLL_THRESHOLD
-    )
+    if (scrollContainerRef.current && scrollContainerRef.current.scrollTop < SCROLL_THRESHOLD) {
       fetchMoreMessages();
+    }
+  };
+
+  const handleBack = () => {
+    setSelectedConversation(null);
+    router.push("/network");
   };
 
   const handleSendMessage = async (content: string) => {
-    if (
-      !selectedConversation ||
-      content.trim() === "" ||
-      !currentUser ||
-      !socket
-    )
-      return;
-
+    if (!selectedConversation || content.trim() === "" || !currentUser || !socket) return;
     const tempId = crypto.randomUUID();
-    const tempSender: SimpleUser = {
-      id: currentUser.id,
-      username: currentUser.username,
-      name: currentUser.name || "Me",
-      image: currentUser.image || null,
-      lastMessage: null,
-      lastMessageTimestamp: null,
-    };
-    const tempMessageBase = {
-      id: tempId,
-      content,
-      createdAt: new Date().toISOString(),
-      senderId: currentUser.id,
-      sender: tempSender,
-      reactions: [],
-      isOptimistic: true,
-    };
+    const tempSender: SimpleUser = { id: currentUser.id, username: currentUser.username, name: currentUser.name || "Me", image: currentUser.image || null, lastMessage: null, lastMessageTimestamp: null };
+    const tempMessageBase = { id: tempId, content, createdAt: new Date().toISOString(), senderId: currentUser.id, sender: tempSender, reactions: [], isOptimistic: true };
 
     let tempMessage: MessageType;
     let eventName = "";
@@ -185,31 +173,19 @@ const ChatPanel: React.FC = () => {
 
     if (selectedConversation.type === "room") {
       eventName = "group:send";
-      payload = {
-        senderId: currentUser.id,
-        roomId: selectedConversation.data.id,
-        content,
-        tempId,
-      };
-      tempMessage = {
-        ...tempMessageBase,
-        roomId: selectedConversation.data.id,
-      } as GroupMessage;
+      payload = { senderId: currentUser.id, roomId: selectedConversation.data.id, content, tempId };
+      tempMessage = { ...tempMessageBase, roomId: selectedConversation.data.id } as GroupMessage;
     } else {
       eventName = "dm:send";
-      payload = {
-        senderId: currentUser.id,
-        recipientId: selectedConversation.data.id,
-        content,
-        tempId,
-      };
-      tempMessage = {
-        ...tempMessageBase,
-        recipientId: selectedConversation.data.id,
-      } as DirectMessage;
+      payload = { senderId: currentUser.id, recipientId: selectedConversation.data.id, content, tempId };
+      tempMessage = { ...tempMessageBase, recipientId: selectedConversation.data.id } as DirectMessage;
     }
     setMessages((prev) => [...prev, tempMessage]);
     socket.emit(eventName, payload);
+    
+    setTimeout(() => {
+        scrollContainerRef.current?.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
+    }, 50);
   };
 
   const handleDeleteMessage = async (messageId: number | string) => {
@@ -217,181 +193,107 @@ const ChatPanel: React.FC = () => {
     const messageType = selectedConversation.type === "room" ? "group" : "dm";
     const oldMessages = messages;
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
-
     try {
-      socket.emit("message:delete", {
-        userId: currentUser.id,
-        messageId: messageId as string,
-        messageType,
-      });
+      socket.emit("message:delete", { userId: currentUser.id, messageId: messageId as string, messageType });
     } catch (err) {
-      setError("Failed to delete message. Please try again.");
+      setError("Failed to delete message.");
       setMessages(oldMessages);
     }
   };
 
-  const handleToggleReaction = async (
-    messageId: number | string,
-    emoji: string
-  ) => {
+  const handleToggleReaction = async (messageId: number | string, emoji: string) => {
     if (!currentUser || !selectedConversation || !socket) return;
     const messageType = selectedConversation.type === "room" ? "group" : "dm";
     const message = messages.find((m) => m.id === messageId);
     if (!message) return;
 
-    const existingReaction = message.reactions.find(
-      (r) => r.emoji === emoji && r.user.id === currentUser.id
-    );
+    const existingReaction = message.reactions.find((r) => r.emoji === emoji && r.user.id === currentUser.id);
     setMessages((prev) =>
       prev.map((msg) => {
         if (msg.id !== messageId) return msg;
         const newReactions = existingReaction
           ? msg.reactions.filter((r) => r.id !== existingReaction.id)
-          : [
-              ...msg.reactions,
-              {
-                id: crypto.randomUUID(),
-                emoji,
-                user: {
-                  id: currentUser.id,
-                  username: currentUser.username,
-                  name: currentUser.name,
-                  image: currentUser.image || null,
-                  lastMessage: null,
-                  lastMessageTimestamp: null,
-                },
-              },
-            ];
+          : [...msg.reactions, { id: crypto.randomUUID(), emoji, user: { id: currentUser.id, username: currentUser.username, name: currentUser.name, image: currentUser.image || null, lastMessage: null, lastMessageTimestamp: null } }];
         return { ...msg, reactions: newReactions };
       })
     );
-
-    socket.emit("reaction:toggle", {
-      userId: currentUser.id,
-      emoji,
-      groupMessageId: messageType === "group" ? messageId : undefined,
-      directMessageId: messageType === "dm" ? messageId : undefined,
-    });
+    socket.emit("reaction:toggle", { userId: currentUser.id, emoji, groupMessageId: messageType === "group" ? messageId : undefined, directMessageId: messageType === "dm" ? messageId : undefined });
   };
 
-  if (!selectedConversation) {
-    return (
-      <div className="flex-grow flex-col hidden md:flex bg-black">
-        <div className="flex flex-col h-full justify-center items-center text-gray-500">
-          <MessageSquare size={100} />
-          <h2 className="mt-4 text-xl font-medium text-gray-400">
-            Select a conversation
-          </h2>
-          <p>Choose a room or DM to start chatting.</p>
-        </div>
-      </div>
-    );
+  if (!selectedConversation) return null;
+
+  // INSTANT BLACK SCREEN
+  if (isSwitching) {
+    return <div className="flex-1 w-full h-full bg-black" />;
   }
 
   const name = selectedConversation.data.name;
-  const imageUrl =
-    selectedConversation.type === "room"
-      ? selectedConversation.data.imageUrl
-      : (selectedConversation.data as SimpleUser).image;
+  const imageUrl = selectedConversation.type === "room" ? selectedConversation.data.imageUrl : (selectedConversation.data as SimpleUser).image;
+  const placeholder = `https://placehold.co/40x40/4f46e5/white?text=${name.charAt(0).toUpperCase()}`;
+  
+  // FIXED IMAGE LOGIC
+  let src = placeholder;
+  if (imageUrl) {
+    src = imageUrl.startsWith("http") ? imageUrl : `${API_BASE_URL}/uploads/${imageUrl}`;
+  }
 
-  const placeholder = `https://placehold.co/40x40/4f46e5/white?text=${name
-    .charAt(0)
-    .toUpperCase()}`;
-  const src = imageUrl ? `${API_BASE_URL}/uploads/${imageUrl}` : placeholder;
-
-  // Online/Offline Status for Header
   const isDM = selectedConversation.type === "dm";
   const convoData = selectedConversation.data as SimpleUser;
-  const statusText = convoData.isOnline
-    ? ""
-    : formatLastSeen(convoData.lastSeen);
+  const statusText = convoData.isOnline ? "Online" : formatLastSeen(convoData.lastSeen);
 
   return (
-    <div className="w-3/4 flex-col hidden md:flex bg-black relative">
-      <div className="flex items-center p-4 bg-black border-b border-white/20">
-        <Link
-          href={
-            selectedConversation.type === "dm"
-              ? `/profile/${(selectedConversation.data as SimpleUser).username}`
-              : "#"
-          }
-        >
-          <Image
-            src={src}
-            alt={name}
-            width={40}
-            height={40}
-            onError={(e) => (e.currentTarget.src = placeholder)}
-            className="w-10 h-10 rounded-full object-cover mr-3"
-          />
+    <div className="flex flex-col h-full w-full bg-black relative overflow-hidden ml-2">
+      <div className="flex-none flex items-center p-3 bg-black border-b border-zinc-800 z-10">
+        <button onClick={handleBack} className="md:hidden mr-3 text-zinc-400 hover:text-white">
+          <ArrowLeft size={24} />
+        </button>
+        <Link href={isDM ? `/profile/${(selectedConversation.data as SimpleUser).username}` : "#"}>
+          <Image src={src} alt={name} width={40} height={40} onError={(e) => (e.currentTarget.src = placeholder)} className="w-10 h-10 rounded-full object-cover mr-3" />
         </Link>
-        <div>
-          <Link
-            href={
-              selectedConversation.type === "dm"
-                ? `/profile/${(selectedConversation.data as SimpleUser).username}`
-                : "#"
-            }
-            className="font-bold text-white hover:underline"
-          >
+        <div className="flex-grow min-w-0">
+          <Link href={isDM ? `/profile/${(selectedConversation.data as SimpleUser).username}` : "#"} className="font-bold text-white hover:underline truncate block">
             {name}
           </Link>
           {isDM ? (
-            <span
-              className={`text-sm block ${
-                convoData.isOnline ? "text-green-500" : "text-zinc-400"
-              }`}
-            >
+            <span className={`text-xs block truncate ${convoData.isOnline ? "text-green-400" : "text-zinc-500"}`}>
               {statusText}
             </span>
           ) : (
-            <span className="text-sm text-zinc-400 block">Group</span>
+            <span className="text-xs text-zinc-500 block">Group</span>
           )}
         </div>
       </div>
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="flex-grow p-4 overflow-y-auto bg-black"
-      >
-        {isLoadingMore && (
-          <div className="flex justify-center my-2">
-            <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
-          </div>
+
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 min-h-0 overflow-y-auto bg-black custom-scrollbar">
+        {isLoadingMore && <div className="flex justify-center my-2"><Loader2 className="w-5 h-5 animate-spin text-indigo-500" /></div>}
+        
+        {/* Show skeleton if loading, otherwise messages */}
+        {isLoadingMessages ? (
+            <ChatPanelSkeleton />
+        ) : (
+            <>
+            {messages.length === 0 && <div className="flex justify-center items-center h-full text-zinc-600">No messages yet.</div>}
+            {currentUser && selectedConversation && (
+                <MessageList messages={messages} currentUser={currentUser} selectedConversation={selectedConversation} onDelete={handleDeleteMessage} onToggleReaction={handleToggleReaction} />
+            )}
+            </>
         )}
-        {isLoadingMessages && <ChatPanelSkeleton />}
+        
         {error && <div className="p-4 text-center text-red-500">{error}</div>}
-        {!isLoadingMessages && messages.length === 0 && (
-          <div className="flex justify-center items-center h-full text-gray-500">
-            No messages yet.
-          </div>
-        )}
-        {!isLoadingMessages && currentUser && selectedConversation && (
-          <MessageList
-            messages={messages}
-            currentUser={currentUser}
-            selectedConversation={selectedConversation}
-            onDelete={handleDeleteMessage}
-            onToggleReaction={handleToggleReaction}
-          />
-        )}
         <div ref={messagesEndRef} />
       </div>
 
       <AnimatePresence>
         {typingUser && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="px-6 pb-2 text-sm text-gray-400 italic"
-          >
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="flex-none px-4 pb-1 text-xs text-zinc-500 italic bg-black">
             {typingUser.name} is typing...
           </motion.div>
         )}
       </AnimatePresence>
 
-      <ChatInput onSend={handleSendMessage} onGetSendButtonPosition={() => {}} />
+      <div className="flex-none w-full bg-black z-10">
+        <ChatInput onSend={handleSendMessage} onGetSendButtonPosition={() => {}} />
+      </div>
     </div>
   );
 };

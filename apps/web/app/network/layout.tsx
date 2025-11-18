@@ -2,15 +2,9 @@
 
 import React, { useEffect } from "react";
 import { useAtom, useSetAtom, atom } from "jotai";
-import { API_BASE_URL } from "@lib/constants";
-import {
-  ChatUserProfile,
-  SimpleUser,
-  MessageType,
-  Reaction,
-} from "@lib/types";
+import { API_BASE_URL } from "@/lib/constants"; // Fixed import path if needed
+import { ChatUserProfile, SimpleUser, MessageType, Reaction } from "@/lib/types"; // Fixed import path
 import NetworkSidebar from "./components/NetworkSidebar";
-import ChatPanel from "./components/ChatPanel";
 import NewChatModal from "./components/NewChatModal";
 import { Loader2 } from "lucide-react";
 import {
@@ -25,6 +19,8 @@ import {
   selectedConversationAtom,
 } from "../store";
 import { io, Socket } from "socket.io-client";
+// Navbar is NOT needed here because it is already in RootLayout
+// import Navbar from "@/shared/Navbar"; 
 
 const WS_URL = "http://localhost:4001";
 export const socketAtom = atom<Socket | null>(null);
@@ -47,12 +43,12 @@ export default function NetworkLayout({
   const setMessages = useSetAtom(messagesAtom);
   const [selectedConversation] = useAtom(selectedConversationAtom);
 
+  // --- Socket Connection & Logic ---
   useEffect(() => {
     if (currentUser) {
       const newSocket = io(WS_URL);
       setSocket(newSocket);
       return () => {
-        console.log("Disconnecting socket...");
         newSocket.disconnect();
         setSocket(null);
       };
@@ -62,7 +58,6 @@ export default function NetworkLayout({
   useEffect(() => {
     if (!socket || !currentUser) return;
 
-    console.log("Attaching listeners for socket:", socket.id);
     socket.emit("authenticate", currentUser.id);
 
     const handleDmConfirm = ({
@@ -73,7 +68,7 @@ export default function NetworkLayout({
       message: MessageType;
     }) => {
       setMessages((prev) =>
-        prev.map((msg) => (msg.id === tempId ? message : msg))
+        prev.map((msg) => (msg.id === tempId ? message : msg)),
       );
     };
 
@@ -81,10 +76,7 @@ export default function NetworkLayout({
       const isSelected =
         selectedConversation?.type === "dm" &&
         selectedConversation.data.id === message.senderId;
-
-      if (isSelected) {
-        setMessages((prev) => [...prev, message]);
-      }
+      if (isSelected) setMessages((prev) => [...prev, message]);
 
       setDmConversations((prev) =>
         prev.map((convo) =>
@@ -93,12 +85,10 @@ export default function NetworkLayout({
                 ...convo,
                 lastMessage: message.content,
                 lastMessageTimestamp: message.createdAt,
-                unseenCount: isSelected
-                  ? 0
-                  : (convo.unseenCount || 0) + 1,
+                unseenCount: isSelected ? 0 : (convo.unseenCount || 0) + 1,
               }
-            : convo
-        )
+            : convo,
+        ),
       );
     };
 
@@ -112,10 +102,9 @@ export default function NetworkLayout({
       const isSelected =
         selectedConversation?.type === "room" &&
         selectedConversation.data.id === message.roomId;
-
       if (message.senderId === currentUser.id) {
         setMessages((prev) =>
-          prev.map((msg) => (msg.id === tempId ? message : msg))
+          prev.map((msg) => (msg.id === tempId ? message : msg)),
         );
       } else if (isSelected) {
         setMessages((prev) => [...prev, message]);
@@ -133,8 +122,8 @@ export default function NetworkLayout({
                     ? (room.unseenCount || 0) + 1
                     : room.unseenCount,
               }
-            : room
-        )
+            : room,
+        ),
       );
     };
 
@@ -155,7 +144,7 @@ export default function NetworkLayout({
               ? [...msg.reactions, reaction]
               : msg.reactions.filter((r) => r.id !== reaction.id);
           return { ...msg, reactions: newReactions };
-        })
+        }),
       );
     };
 
@@ -168,8 +157,8 @@ export default function NetworkLayout({
         prev.map((convo) =>
           convo.id === user.id
             ? { ...convo, isOnline: user.isOnline, lastSeen: user.lastSeen }
-            : convo
-        )
+            : convo,
+        ),
       );
     };
 
@@ -181,7 +170,6 @@ export default function NetworkLayout({
     socket.on("user:status", handleUserStatus);
 
     return () => {
-      console.log("Detaching listeners for socket:", socket.id);
       socket.off("dm:confirm", handleDmConfirm);
       socket.off("dm:receive", handleDmReceive);
       socket.off("group:receive", handleGroupReceive);
@@ -217,12 +205,12 @@ export default function NetworkLayout({
       setError(null);
       try {
         const res = await fetch(
-          `${API_BASE_URL}/user/profile/${currentUser.username}`
+          `${API_BASE_URL}/user/profile/${currentUser.username}`,
         );
         if (!res.ok) throw new Error("Failed to fetch user profile");
         const profile: ChatUserProfile = await res.json();
         setUserRooms(
-          profile.rooms?.map((room) => ({ ...room, unseenCount: 0 })) || []
+          profile.rooms?.map((room) => ({ ...room, unseenCount: 0 })) || [],
         );
         setFollowingList(profile.following || []);
       } catch (err: any) {
@@ -235,12 +223,12 @@ export default function NetworkLayout({
     const fetchDmConversations = async () => {
       try {
         const res = await fetch(
-          `${API_BASE_URL}/chat/dm/conversations/${currentUser.id}`
+          `${API_BASE_URL}/chat/dm/conversations/${currentUser.id}`,
         );
         if (!res.ok) throw new Error("Failed to fetch DM conversations");
         const conversations: SimpleUser[] = await res.json();
         setDmConversations(
-          conversations.map((convo) => ({ ...convo, unseenCount: 0 }))
+          conversations.map((convo) => ({ ...convo, unseenCount: 0 })),
         );
       } catch (err: any) {
         setError(err.message);
@@ -260,24 +248,30 @@ export default function NetworkLayout({
 
   if (!currentUser && !isLoading.profile) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-black text-gray-400">
+      <div className="w-full h-full flex items-center justify-center bg-black text-gray-400 z-50">
         <div className="text-center">
           <Loader2 className="w-8 h-8 mx-auto animate-spin text-indigo-500" />
           <h1 className="mt-4 text-xl font-semibold text-gray-200">
             Loading User...
           </h1>
-          <p className="text-gray-400">Please log in to access your network.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full w-full bg-black font-sans text-gray-200">
-      <NetworkSidebar />
-      <ChatPanel />
+    // CHANGED: Removed "fixed inset-0". 
+    // Used "h-full w-full relative" to respect the RootLayout flex container.
+    <div className="w-full h-full bg-black font-sans text-gray-200 flex overflow-hidden relative z-0">
+      <div className="hidden md:flex h-full w-1/3 lg:w-1/4 border-r border-zinc-800 flex-col">
+        <NetworkSidebar />
+      </div>
+
+      <div className="flex-grow h-full w-full md:w-2/3 lg:w-3/4 relative flex flex-col">
+        {children}
+      </div>
+
       {isModalOpen && <NewChatModal />}
-      {children}
     </div>
   );
 }
