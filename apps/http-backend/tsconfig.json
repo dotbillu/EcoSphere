@@ -5,6 +5,9 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
+      "@posts": [
+        "./src/routes/posts/index.ts"
+      ],
       "@chats": [
         "./src/routes/chats/index.ts"
       ],
@@ -14,7 +17,7 @@
       "@maps": [
         "./src/routes/maps/index"
       ],
-      "@multer":[
+      "@multer": [
         "./src/multer"
       ]
     }

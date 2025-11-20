@@ -12,18 +12,14 @@ import {
   Calendar,
   Clock,
   Coins,
-  User,
   Link,
   Unlink,
-  Loader2,
   Handshake,
-  MessageCircle,
 } from "lucide-react";
 import { useState } from "react";
-import { getImageUrl, haversineDistance } from "@lib/utils";
+import { getImageUrl, haversineDistance } from "@/lib/utils";
 import { GigElement, MapElement } from "./MapTypes";
 import { motion } from "framer-motion";
-import { API_BASE_URL } from "@lib/constants";
 import { User as UserType } from "@/store";
 import LinkNext from "next/link";
 
@@ -31,24 +27,24 @@ type GigDetailSidebarProps = {
   gig: GigElement;
   currentUser?: UserType | null;
   userLocation: { lat: number; lng: number };
-  onClose: () => void;
-  onDelete: () => void;
-  onShowLightbox: (index: number) => void;
-  onSaveEdit: (
-    updatedData: Partial<GigElement> & { roomId?: string | null }
+  onCloseAction: () => void;
+  onDeleteAction: () => void;
+  onShowLightboxAction: (index: number) => void;
+  onSaveEditAction: (
+    updatedData: Partial<GigElement> & { roomId?: string | null },
   ) => void;
-  onSelectRoom: (room: MapElement) => void;
+  onSelectRoomAction: (room: MapElement) => void;
 };
 
 export default function GigDetailSidebar({
   gig,
   currentUser,
   userLocation,
-  onClose,
-  onDelete,
-  onShowLightbox,
-  onSaveEdit,
-  onSelectRoom,
+  onCloseAction,
+  onDeleteAction,
+  onShowLightboxAction,
+  onSaveEditAction,
+  onSelectRoomAction,
 }: GigDetailSidebarProps) {
   const isOwner = currentUser?.id === gig.createdBy?.id;
   const [isEditing, setIsEditing] = useState(false);
@@ -64,7 +60,7 @@ export default function GigDetailSidebar({
     userLocation.lat,
     userLocation.lng,
     gig.latitude,
-    gig.longitude
+    gig.longitude,
   );
 
   const handleCancelEdit = () => {
@@ -78,32 +74,32 @@ export default function GigDetailSidebar({
     });
   };
 
-  const handleChange = (
-    field: string,
-    value: string
-  ) => setForm((prev) => ({ ...prev, [field]: value }));
+  const handleChange = (field: string, value: string) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSaveDetails = () => {
-    onSaveEdit({
+    onSaveEditAction({
       ...form,
       date: form.date ? new Date(form.date).toISOString() : undefined,
-      expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : undefined,
+      expiresAt: form.expiresAt
+        ? new Date(form.expiresAt).toISOString()
+        : undefined,
     });
     setIsEditing(false);
   };
 
   const handleRoomClick = () => {
     if (gig.room) {
-      onSelectRoom(gig.room as MapElement);
+      onSelectRoomAction(gig.room as unknown as MapElement);
     }
   };
 
   const acceptGigUrl = `/network/${gig.createdBy?.id}?gigRef=${gig.id}`;
-  
+
   const handleNavigate = () => {
     window.open(
-      `https://www.google.com/maps/dir/?api=1&destination=${gig.latitude},${gig.longitude}`,
-      "_blank"
+      `http://googleusercontent.com/maps.google.com/maps?daddr=${gig.latitude},${gig.longitude}`,
+      "_blank",
     );
   };
 
@@ -128,7 +124,7 @@ export default function GigDetailSidebar({
             {gig.title}
           </h2>
         )}
-        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+        <div className="flex items-center gap-1 shrink-0 ml-2">
           {isOwner && !isEditing && (
             <button
               onClick={() => setIsEditing(true)}
@@ -154,7 +150,7 @@ export default function GigDetailSidebar({
             </>
           )}
           <button
-            onClick={onClose}
+            onClick={onCloseAction}
             className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white transition"
           >
             <X size={20} />
@@ -162,12 +158,12 @@ export default function GigDetailSidebar({
         </div>
       </div>
 
-      <div className="flex-grow overflow-y-auto p-4 space-y-6">
+      <div className="grow overflow-y-auto p-4 space-y-6">
         {gig.imageUrls?.length > 0 && (
           <div className="space-y-2">
             <div
               className="relative w-full h-48 md:h-64 rounded-lg overflow-hidden group cursor-pointer"
-              onClick={() => onShowLightbox(0)}
+              onClick={() => onShowLightboxAction(0)}
             >
               <Image
                 src={getImageUrl(gig.imageUrls[0])}
@@ -182,7 +178,7 @@ export default function GigDetailSidebar({
                   <div
                     key={idx}
                     className="relative w-full h-16 rounded-md overflow-hidden cursor-pointer group"
-                    onClick={() => onShowLightbox(idx + 1)}
+                    onClick={() => onShowLightboxAction(idx + 1)}
                   >
                     <Image
                       src={getImageUrl(url)}
@@ -243,7 +239,7 @@ export default function GigDetailSidebar({
                   <label className="text-xs text-zinc-400">Gig Date/Time</label>
                   <input
                     type="datetime-local"
-                    className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-white/50 [color-scheme:dark]"
+                    className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-white/50 scheme-dark"
                     value={form.date}
                     onChange={(e) => handleChange("date", e.target.value)}
                   />
@@ -252,7 +248,7 @@ export default function GigDetailSidebar({
                   <label className="text-xs text-zinc-400">Expires At</label>
                   <input
                     type="datetime-local"
-                    className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-white/50 [color-scheme:dark]"
+                    className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-white/50 scheme-dark"
                     value={form.expiresAt}
                     onChange={(e) => handleChange("expiresAt", e.target.value)}
                   />
@@ -261,7 +257,10 @@ export default function GigDetailSidebar({
             ) : (
               <>
                 <InfoRow icon={MapPin} text={distance} />
-                <InfoRow icon={Coins} text={gig.reward || "No reward specified"} />
+                <InfoRow
+                  icon={Coins}
+                  text={gig.reward || "No reward specified"}
+                />
                 {gig.description && (
                   <p className="text-zinc-300 whitespace-pre-wrap leading-relaxed">
                     {gig.description}
@@ -302,14 +301,13 @@ export default function GigDetailSidebar({
               <MapPin size={20} className="text-zinc-500" />
             </button>
           ) : (
-            <p className="text-sm text-zinc-500">
-              No room linked to this gig.
-            </p>
+            <p className="text-sm text-zinc-500">No room linked to this gig.</p>
           )}
-          {isOwner && isEditing && (
-            gig.room ? (
+          {isOwner &&
+            isEditing &&
+            (gig.room ? (
               <button
-                onClick={() => onSaveEdit({ roomId: null })}
+                onClick={() => onSaveEditAction({ roomId: null })}
                 className="w-full mt-2 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-lg transition flex items-center justify-center gap-2"
               >
                 <Unlink size={16} /> Disconnect Room
@@ -321,12 +319,11 @@ export default function GigDetailSidebar({
               >
                 <Link size={16} /> Connect Room (via Create)
               </button>
-            )
-          )}
+            ))}
         </InfoSection>
       </div>
 
-      <div className="flex-shrink-0 p-4 border-t border-zinc-800 flex gap-3">
+      <div className="shrink-0 p-4 border-t border-zinc-800 flex gap-3">
         {!isOwner && currentUser && (
           <LinkNext
             href={acceptGigUrl}
@@ -338,7 +335,7 @@ export default function GigDetailSidebar({
         <button
           onClick={handleNavigate}
           className={`px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium rounded-lg transition flex items-center justify-center gap-2 ${
-            !isOwner && currentUser ? "flex-grow-0" : "flex-1"
+            !isOwner && currentUser ? "grow-0" : "flex-1"
           }`}
         >
           <Navigation size={16} />
@@ -348,7 +345,7 @@ export default function GigDetailSidebar({
         </button>
         {isOwner && !isEditing && (
           <button
-            onClick={onDelete}
+            onClick={onDeleteAction}
             className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-sm font-medium rounded-lg transition flex items-center justify-center"
           >
             <Trash2 size={16} />
@@ -384,7 +381,7 @@ const InfoRow = ({
   colorClass?: string;
 }) => (
   <p className={`flex items-center gap-3 ${colorClass}`}>
-    <Icon size={16} className="flex-shrink-0" />
+    <Icon size={16} className="shrink-0" />
     <span className="text-zinc-200">{text}</span>
   </p>
 );

@@ -6,7 +6,6 @@ import {
   X,
   Trash2,
   Navigation,
-  Users,
   Calendar,
   Pencil,
   Check,
@@ -14,7 +13,7 @@ import {
   LogIn,
   MessageCircle,
 } from "lucide-react";
-import { getImageUrl } from "@lib/utils";
+import { getImageUrl } from "@/lib/utils";
 import { MapElement } from "./MapTypes";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -22,21 +21,22 @@ import Link from "next/link";
 type RoomDetailSidebarProps = {
   room: MapElement;
   currentUserId?: string;
-  onClose: () => void;
-  onNavigate: () => void;
-  onDelete: () => void;
-  onJoin: () => void;
-  onSaveEdit: (updatedData: { name: string; description: string }) => void;
+  onCloseAction: () => void;
+  onDeleteAction: () => void;
+  onJoinAction: () => void;
+  onSaveEditAction: (updatedData: {
+    name: string;
+    description: string;
+  }) => void;
 };
 
 export default function RoomDetailSidebar({
   room,
   currentUserId,
-  onClose,
-  onNavigate,
-  onDelete,
-  onJoin,
-  onSaveEdit,
+  onCloseAction,
+  onDeleteAction,
+  onJoinAction,
+  onSaveEditAction,
 }: RoomDetailSidebarProps) {
   const isOwner = currentUserId === room.createdBy?.id;
   const isMember = useMemo(() => {
@@ -56,7 +56,7 @@ export default function RoomDetailSidebar({
     setForm((p) => ({ ...p, [key]: val }));
 
   const handleSave = () => {
-    onSaveEdit(form);
+    onSaveEditAction(form);
     setIsEditing(false);
   };
 
@@ -70,8 +70,8 @@ export default function RoomDetailSidebar({
 
   const handleNavigate = () => {
     window.open(
-      `https://www.google.com/maps/dir/?api=1&destination=${room.latitude},${room.longitude}`,
-      "_blank"
+      `http://googleusercontent.com/maps.google.com/maps?daddr=${room.latitude},${room.longitude}`,
+      "_blank",
     );
   };
 
@@ -83,7 +83,7 @@ export default function RoomDetailSidebar({
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
       className="absolute top-0 left-0 z-40 h-full w-full max-w-md bg-black text-zinc-100 flex flex-col shadow-2xl md:w-[480px] md:border-r md:border-zinc-800"
     >
-      <div className="flex-shrink-0 flex items-start justify-between p-4 border-b border-zinc-800">
+      <div className="shrink-0 flex items-start justify-between p-4 border-b border-zinc-800">
         {isEditing ? (
           <input
             value={form.name}
@@ -96,7 +96,7 @@ export default function RoomDetailSidebar({
             {room.name}
           </h2>
         )}
-        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+        <div className="flex items-center gap-1 shrink-0 ml-2">
           {isOwner && !isEditing && (
             <button
               onClick={() => setIsEditing(true)}
@@ -122,7 +122,7 @@ export default function RoomDetailSidebar({
             </>
           )}
           <button
-            onClick={onClose}
+            onClick={onCloseAction}
             className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white transition"
           >
             <X size={20} />
@@ -130,7 +130,7 @@ export default function RoomDetailSidebar({
         </div>
       </div>
 
-      <div className="flex-grow overflow-y-auto p-4 space-y-6">
+      <div className="grow overflow-y-auto p-4 space-y-6">
         {room.imageUrl && (
           <div className="relative w-full h-48 md:h-64 rounded-lg overflow-hidden group">
             <Image
@@ -181,7 +181,7 @@ export default function RoomDetailSidebar({
               <InfoRow
                 icon={Calendar}
                 text={`Created ${new Date(
-                  room.createdAt
+                  room.createdAt,
                 ).toLocaleDateString()}`}
               />
               {room.description ? (
@@ -221,10 +221,10 @@ export default function RoomDetailSidebar({
         </InfoSection>
       </div>
 
-      <div className="flex-shrink-0 p-4 border-t border-zinc-800 flex gap-3">
+      <div className="shrink-0 p-4 border-t border-zinc-800 flex gap-3">
         {canJoin && (
           <button
-            onClick={onJoin}
+            onClick={onJoinAction}
             className="flex-1 px-4 py-3 bg-white hover:bg-zinc-200 text-black text-sm font-medium rounded-lg transition flex items-center justify-center gap-2"
           >
             <LogIn size={16} /> Join Room
@@ -246,7 +246,7 @@ export default function RoomDetailSidebar({
         </button>
         {isOwner && (
           <button
-            onClick={onDelete}
+            onClick={onDeleteAction}
             className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-sm font-medium rounded-lg transition flex items-center justify-center"
           >
             <Trash2 size={16} />
@@ -282,7 +282,7 @@ const InfoRow = ({
   colorClass?: string;
 }) => (
   <p className={`flex items-center gap-3 ${colorClass}`}>
-    <Icon size={16} className="flex-shrink-0" />
+    <Icon size={16} className="shrink-0" />
     <span className="text-zinc-200">{text}</span>
   </p>
 );

@@ -1,7 +1,7 @@
 import { Gig, MapRoom } from "@/store";
-import { SimpleUser } from "@lib/types";
+import { SimpleUser } from "@/lib/types";
 
-export interface MapElement extends Omit<MapRoom, "members"> {
+export interface MapElement extends Omit<MapRoom, "members" | "createdBy"> {
   id: string;
   creatorId?: string;
   createdBy?: {
@@ -13,7 +13,7 @@ export interface MapElement extends Omit<MapRoom, "members"> {
   members?: SimpleUser[];
 }
 
-export interface GigElement extends Gig {
+export interface GigElement extends Omit<Gig, "createdBy"> {
   id: string;
   creatorId?: string;
   createdBy?: {
@@ -27,4 +27,6 @@ export interface GigElement extends Gig {
     name: string;
     type: string;
   } | null;
+  reward?: string | null;
+  expiresAt?: string | null;
 }

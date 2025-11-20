@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, Suspense } from "react";
-import { useAtom } from "jotai";
 import {
-  GoogleMap,
-  useJsApiLoader,
-  MarkerF,
-} from "@react-google-maps/api";
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  Suspense,
+  useCallback,
+} from "react";
+import { useAtom } from "jotai";
+import { GoogleMap, useJsApiLoader, MarkerF } from "@react-google-maps/api";
 import { useSearchParams, useRouter } from "next/navigation";
 import { locationAtom, userAtom } from "@/store";
-import { Home, Star, Layers, X } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
-import { getImageUrl, getHaversineDistanceInMeters } from "@lib/utils";
+import { Home, Star } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { getImageUrl, getHaversineDistanceInMeters } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/constants";
+
 import { mapOptions } from "./map/mapOptions";
 import { MapElement, GigElement } from "./map/MapTypes";
 import GigDetailSidebar from "./map/GigDetailSidebar";
@@ -19,7 +24,6 @@ import RoomDetailSidebar from "./map/RoomDetailSidebar";
 import Lightbox from "./map/Lightbox";
 import CreateRoomModal from "./map/CreateRoomModal";
 import CreateGigModal from "./map/CreateGigModal";
-import { API_BASE_URL } from "@lib/constants";
 
 const sanitizeCoords = (item: any) => {
   if (!item) return null;
@@ -61,13 +65,16 @@ function MapContent() {
 
   const icons = useMemo(() => {
     if (!isLoaded) return null;
-    const commonSize = new google.maps.Size(36, 36);
+    const g = (window as any).google;
+    if (!g) return null;
+
+    const commonSize = new g.maps.Size(36, 36);
     return {
       room: {
         url:
           "data:image/svg+xml;charset=UTF-8," +
           encodeURIComponent(
-            '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="white"/><path d="M8 21V11H16V21" stroke="#09090b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 10L12 3L21 10" stroke="#09090b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+            '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="white"/><path d="M8 21V11H16V21" stroke="#09090b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 10L12 3L21 10" stroke="#09090b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
           ),
         scaledSize: commonSize,
       },
@@ -75,7 +82,7 @@ function MapContent() {
         url:
           "data:image/svg+xml;charset=UTF-8," +
           encodeURIComponent(
-            '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#09090b" stroke="white" stroke-width="1.5"/><path d="M12 17.27L18.18 21L17 14.14L22 9.27L15.09 8.26L12 2L8.91 8.26L2 9.27L7 14.14L5.82 21L12 17.27Z" fill="white"/></svg>'
+            '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#09090b" stroke="white" stroke-width="1.5"/><path d="M12 17.27L18.18 21L17 14.14L22 9.27L15.09 8.26L12 2L8.91 8.26L2 9.27L7 14.14L5.82 21L12 17.27Z" fill="white"/></svg>',
           ),
         scaledSize: commonSize,
       },
@@ -83,12 +90,39 @@ function MapContent() {
         url:
           "data:image/svg+xml;charset=UTF-8," +
           encodeURIComponent(
-            '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="#3B82F6" stroke="#FFFFFF" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></svg>'
+            '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="#3B82F6" stroke="#FFFFFF" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></svg>',
           ),
-        scaledSize: new google.maps.Size(32, 32),
+        scaledSize: new g.maps.Size(32, 32),
       },
     };
   }, [isLoaded]);
+
+  const handleSelectRoom = useCallback(
+    (room: MapElement) => {
+      setSelectedRoom(room);
+      setSelectedGig(null);
+      setIsSidebarOpen(true);
+      router.push(`/map?roomId=${room.id}`, { scroll: false });
+    },
+    [router],
+  );
+
+  const handleSelectGig = useCallback(
+    (gig: GigElement) => {
+      setSelectedGig(gig);
+      setSelectedRoom(null);
+      setIsSidebarOpen(true);
+      router.push(`/map?gigId=${gig.id}`, { scroll: false });
+    },
+    [router],
+  );
+
+  const closeSidebar = useCallback(() => {
+    setSelectedGig(null);
+    setSelectedRoom(null);
+    setIsSidebarOpen(false);
+    router.push(`/map`, { scroll: false });
+  }, [router]);
 
   useEffect(() => {
     if (!("geolocation" in navigator)) {
@@ -101,7 +135,7 @@ function MapContent() {
       (err) => {
         if (err.code === 1) setPermissionDenied(true);
         setLocation({ lat: 28.4089, lng: 77.3178 });
-      }
+      },
     );
   }, [setLocation]);
 
@@ -132,7 +166,7 @@ function MapContent() {
               allElements[i].latitude,
               allElements[i].longitude,
               allElements[j].latitude,
-              allElements[j].longitude
+              allElements[j].longitude,
             );
 
             if (dist < 10) {
@@ -161,12 +195,12 @@ function MapContent() {
 
           if (finalGigId) {
             const gigToSelect = finalGigs.find(
-              (g: GigElement) => g.id === finalGigId
+              (g: GigElement) => g.id === finalGigId,
             );
             if (gigToSelect) handleSelectGig(gigToSelect);
           } else if (finalRoomId) {
             const roomToSelect = finalRooms.find(
-              (r: MapElement) => r.id === finalRoomId
+              (r: MapElement) => r.id === finalRoomId,
             );
             if (roomToSelect) handleSelectRoom(roomToSelect);
           }
@@ -177,28 +211,7 @@ function MapContent() {
       }
     };
     fetchData();
-  }, [isLoaded, searchParams]);
-
-  const handleSelectRoom = (room: MapElement) => {
-    setSelectedRoom(room);
-    setSelectedGig(null);
-    setIsSidebarOpen(true);
-    router.push(`/map?roomId=${room.id}`, { scroll: false });
-  };
-
-  const handleSelectGig = (gig: GigElement) => {
-    setSelectedGig(gig);
-    setSelectedRoom(null);
-    setIsSidebarOpen(true);
-    router.push(`/map?gigId=${gig.id}`, { scroll: false });
-  };
-
-  const closeSidebar = () => {
-    setSelectedGig(null);
-    setSelectedRoom(null);
-    setIsSidebarOpen(false);
-    router.push(`/map`, { scroll: false });
-  };
+  }, [isLoaded, searchParams, handleSelectGig, handleSelectRoom]);
 
   const handleJoinRoom = async (roomId: string) => {
     if (!user) return;
@@ -212,7 +225,7 @@ function MapContent() {
       const { room: updatedRoom } = await res.json();
       const sanitizedRoom = sanitizeCoords(updatedRoom) as MapElement;
       setRooms((prev) =>
-        prev.map((r) => (r.id === sanitizedRoom.id ? sanitizedRoom : r))
+        prev.map((r) => (r.id === sanitizedRoom.id ? sanitizedRoom : r)),
       );
       setSelectedRoom(sanitizedRoom);
     } catch (err) {
@@ -221,7 +234,7 @@ function MapContent() {
   };
 
   const handleSaveGigEdit = async (
-    updatedData: Partial<GigElement> & { roomId?: string | null }
+    updatedData: Partial<GigElement> & { roomId?: string | null },
   ) => {
     if (!selectedGig) return;
     try {
@@ -234,7 +247,7 @@ function MapContent() {
       const { gig: updatedGig } = await res.json();
       const sanitizedGig = sanitizeCoords(updatedGig) as GigElement;
       setGigs((prev) =>
-        prev.map((g) => (g.id === sanitizedGig.id ? sanitizedGig : g))
+        prev.map((g) => (g.id === sanitizedGig.id ? sanitizedGig : g)),
       );
       setSelectedGig(sanitizedGig);
     } catch (err) {
@@ -257,7 +270,7 @@ function MapContent() {
       const { room: updatedRoom } = await res.json();
       const sanitizedRoom = sanitizeCoords(updatedRoom) as MapElement;
       setRooms((prev) =>
-        prev.map((r) => (r.id === sanitizedRoom.id ? sanitizedRoom : r))
+        prev.map((r) => (r.id === sanitizedRoom.id ? sanitizedRoom : r)),
       );
       setSelectedRoom(sanitizedRoom);
     } catch (err) {
@@ -281,9 +294,12 @@ function MapContent() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("delete failed");
-      type === "gig"
-        ? setGigs((prev) => prev.filter((g) => g.id !== el.id))
-        : setRooms((prev) => prev.filter((r) => r.id !== el.id));
+
+      if (type === "gig") {
+        setGigs((prev) => prev.filter((g) => g.id !== el.id));
+      } else {
+        setRooms((prev) => prev.filter((r) => r.id !== el.id));
+      }
       closeSidebar();
     } catch (e) {
       console.error(e);
@@ -328,12 +344,12 @@ function MapContent() {
                 key="gig-sidebar"
                 gig={selectedGig}
                 currentUser={user}
-                userLocation={location}
-                onClose={closeSidebar}
-                onDelete={() => handleDelete(selectedGig)}
-                onShowLightbox={handleOpenLightbox}
-                onSaveEdit={handleSaveGigEdit}
-                onSelectRoom={handleSelectRoomFromSidebar}
+                userLocation={center}
+                onCloseAction={closeSidebar}
+                onDeleteAction={() => handleDelete(selectedGig)}
+                onShowLightboxAction={handleOpenLightbox}
+                onSaveEditAction={handleSaveGigEdit}
+                onSelectRoomAction={handleSelectRoomFromSidebar}
               />
             )}
             {selectedRoom && (
@@ -341,10 +357,10 @@ function MapContent() {
                 key="room-sidebar"
                 room={selectedRoom}
                 currentUserId={user?.id}
-                onClose={closeSidebar}
-                onDelete={() => handleDelete(selectedRoom)}
-                onJoin={() => handleJoinRoom(selectedRoom.id)}
-                onSaveEdit={handleSaveRoomEdit}
+                onCloseAction={closeSidebar}
+                onDeleteAction={() => handleDelete(selectedRoom)}
+                onJoinAction={() => handleJoinRoom(selectedRoom.id)}
+                onSaveEditAction={handleSaveRoomEdit}
               />
             )}
           </div>
@@ -436,7 +452,7 @@ function MapContent() {
                 r.imageUrl
                   ? {
                       url: getImageUrl(r.imageUrl),
-                      scaledSize: new google.maps.Size(36, 36),
+                      scaledSize: new (window as any).google.maps.Size(36, 36),
                     }
                   : icons.room
               }
@@ -459,7 +475,7 @@ function MapContent() {
 
       {isRoomModalOpen && (
         <CreateRoomModal
-          location={location}
+          location={center}
           onClose={() => setRoomModalOpen(false)}
           onSuccess={(newRoom) => {
             const sanitizedRoom = sanitizeCoords(newRoom);
@@ -472,7 +488,7 @@ function MapContent() {
       )}
       {isGigModalOpen && (
         <CreateGigModal
-          location={location}
+          location={center}
           onClose={() => setGigModalOpen(false)}
           onSuccess={(newGig) => {
             const sanitizedGig = sanitizeCoords(newGig);

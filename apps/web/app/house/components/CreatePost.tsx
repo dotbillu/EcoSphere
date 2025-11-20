@@ -1,19 +1,18 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Image as ImageIcon, MapPin, X } from "lucide-react";
-import { useAtom } from "jotai";
-import { locationAtom, userAtom, Post } from "@/store";
-import NextImage from "next/image";
+import React, { useState, useRef } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
+import { Image as LucideImage, MapPin, X } from "lucide-react";
+import { useAtom } from "jotai";
+import { userAtom, locationAtom, type Post } from "@/store";
 import { API_BASE_URL } from "@/lib/constants";
-import Avatar from "../ui/Avatar";
 
-export default function CreatePost({
-  onPostCreated,
-}: {
+interface CreatePostProps {
   onPostCreated: (newPost: Post) => void;
-}) {
+}
+
+export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const [content, setContent] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -26,13 +25,12 @@ export default function CreatePost({
   const [coords, setCoords] = useAtom(locationAtom);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  if (!user) {
+  if (!user)
     return (
-      <p className="p-4 text-center text-zinc-500 border-b border-zinc-800">
+      <p className="p-4 text-center text-gray-400 border-b border-gray-700">
         Please login to post
       </p>
     );
-  }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -80,7 +78,11 @@ export default function CreatePost({
   const handleLocationToggle = async () => {
     const toggle = !includeLocation;
     setIncludeLocation(toggle);
-    if (toggle && (!coords.lat || !coords.lng)) await requestLocation();
+
+    if (toggle && (!coords.lat || !coords.lng)) {
+      await requestLocation();
+    }
+
     if (toggle && coords.lat && coords.lng) {
       const city = await getCityFromCoords(coords.lat, coords.lng);
       setLocationName(city);
@@ -97,6 +99,7 @@ export default function CreatePost({
     if (el) {
       el.style.height = "auto";
       el.style.height = `${Math.min(el.scrollHeight, 250)}px`;
+      el.style.overflowY = el.scrollHeight > 250 ? "auto" : "hidden";
     }
   };
 
@@ -122,13 +125,18 @@ export default function CreatePost({
         body: formData,
       });
       if (!res.ok) throw new Error(await res.text());
+
       const newPost: Post = await res.json();
+
       setContent("");
       setImages([]);
       setPreviews([]);
       setIncludeLocation(false);
       setLocationName("");
-      if (onPostCreated) onPostCreated(newPost);
+
+      if (onPostCreated) {
+        onPostCreated(newPost);
+      }
     } catch {
       setError("Upload failed. Please try again.");
     } finally {
@@ -141,45 +149,64 @@ export default function CreatePost({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="p-4 border-b border-zinc-700 space-y-3"
+      className="p-4 border-b border-gray-700 space-y-3"
     >
       {error && <p className="text-red-500 text-sm">{error}</p>}
       <div className="flex gap-3">
-        <Avatar src={user.image} name={user.name} size={48} />
+        <div className="flex-shrink-0">
+          {user.image ? (
+            <Image
+              src={
+                user.image.startsWith("http")
+                  ? user.image
+                  : `${API_BASE_URL}/uploads/${user.image}`
+              }
+              alt={user.name}
+              width={48}
+              height={48}
+              className="rounded-full object-cover w-12 h-12"
+            />
+          ) : (
+            <div className="bg-neutral-focus text-neutral-content rounded-full w-12 h-12 flex items-center justify-center">
+              <span>{user.name[0].toUpperCase()}</span>
+            </div>
+          )}
+        </div>
         <div className="flex-1 relative">
           <textarea
             ref={textareaRef}
             value={content}
             onChange={handleTextChange}
-            placeholder="What's happening?"
-            className="w-full bg-transparent border-none resize-none focus:outline-none text-white placeholder-zinc-500 text-xl"
+            placeholder="What’s happening?"
+            className="w-full bg-transparent border-none resize-none focus:outline-none text-white placeholder-gray-500 text-xl overflow-hidden"
             rows={1}
           />
           <div className="flex flex-wrap gap-3 mt-3">
             {previews.map((src, index) => (
               <div
                 key={index}
-                className="relative w-32 h-32 rounded-xl overflow-hidden border border-zinc-700"
+                className="relative w-32 h-32 rounded-2xl overflow-hidden border border-gray-700"
               >
-                <NextImage
+                <Image
                   src={src}
-                  alt="preview"
+                  alt={`preview-${index}`}
                   fill
                   className="object-cover"
                 />
                 <button
                   onClick={() => removeImage(index)}
-                  className="absolute top-1 right-1 bg-black/60 rounded-full p-1 hover:bg-black/80"
+                  className="absolute top-1 right-1 bg-black/60 rounded-full p-1 hover:bg-black/80 transition"
                 >
                   <X className="w-4 h-4 text-white" />
                 </button>
               </div>
             ))}
           </div>
-          <div className="flex justify-between items-center mt-3 border-t border-zinc-800 pt-3">
-            <div className="flex gap-4 items-center text-blue-500">
-              <label className="cursor-pointer hover:text-blue-400 transition-colors">
-                <ImageIcon className="w-5 h-5" />
+          <div className="flex justify-between items-center mt-3">
+            <span className="text-gray-400 text-sm">{content.length}/5000</span>
+            <div className="flex gap-4 items-center relative text-white-500">
+              <label className="cursor-pointer hover:text-white-400">
+                <LucideImage className="w-5 h-5" />
                 <input
                   type="file"
                   accept="image/*"
@@ -190,19 +217,18 @@ export default function CreatePost({
               </label>
               <button
                 onClick={handleLocationToggle}
-                className={`flex items-center gap-1 text-sm cursor-pointer ${includeLocation ? "text-blue-400" : "hover:text-blue-400"} transition-colors`}
+                className={`flex items-center gap-1 text-sm cursor-pointer ${
+                  includeLocation
+                    ? "text-blue-500 hover:text-white-400"
+                    : "hover:text-white-400"
+                }`}
               >
                 <MapPin className="w-5 h-5" />
               </button>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-zinc-600 text-xs">
-                {content.length}/5000
-              </span>
               <button
                 onClick={handlePost}
                 disabled={loading || (!content.trim() && images.length === 0)}
-                className="rounded-full bg-white text-black font-bold px-5 py-1.5 hover:bg-zinc-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn btn-sm rounded-full bg-white-500 text-white font-bold px-5 py-2 border-none hover:bg-white-600 transition disabled:opacity-50 disabled:bg-white-800"
               >
                 {loading ? "Posting..." : "Post"}
               </button>

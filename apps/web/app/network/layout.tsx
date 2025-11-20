@@ -2,11 +2,17 @@
 
 import React, { useEffect } from "react";
 import { useAtom, useSetAtom, atom } from "jotai";
-import { API_BASE_URL, WS_BASE_URL } from "@/lib/constants"; // Fixed import path if needed
-import { ChatUserProfile, SimpleUser, MessageType, Reaction } from "@/lib/types"; // Fixed import path
-import NetworkSidebar from "./components/NetworkSidebar";
-import NewChatModal from "./components/NewChatModal";
+import { io, Socket } from "socket.io-client";
 import { Loader2 } from "lucide-react";
+
+// Shared / Lib Imports
+import { API_BASE_URL, WS_BASE_URL } from "@/lib/constants";
+import { ChatUserProfile, SimpleUser, MessageType, Reaction } from "@/lib/types";
+
+// Components
+import NetworkSidebar from "./components/NetworkSidebar";
+
+// Store Imports
 import {
   userAtom,
   userRoomsAtom,
@@ -14,13 +20,9 @@ import {
   followingListAtom,
   networkLoadingAtom,
   networkErrorAtom,
-  isNewChatModalOpenAtom,
   messagesAtom,
   selectedConversationAtom,
-} from "../store";
-import { io, Socket } from "socket.io-client";
-// Navbar is NOT needed here because it is already in RootLayout
-// import Navbar from "@/shared/Navbar"; 
+} from "@/store";
 
 export const socketAtom = atom<Socket | null>(null);
 
@@ -36,46 +38,45 @@ export default function NetworkLayout({
   const [isLoading] = useAtom(networkLoadingAtom);
   const setError = useSetAtom(networkErrorAtom);
   const setLoading = useSetAtom(networkLoadingAtom);
-  const [isModalOpen] = useAtom(isNewChatModalOpenAtom);
 
   const [socket, setSocket] = useAtom(socketAtom);
   const setMessages = useSetAtom(messagesAtom);
   const [selectedConversation] = useAtom(selectedConversationAtom);
 
-  // --- Socket Connection & Logic ---
+  // 1. SOCKET CONNECTION (FIXED: Removed 'socket' from dependency array)
   useEffect(() => {
-    if (currentUser) {
-      const newSocket = io(WS_BASE_URL);
-      setSocket(newSocket);
-      return () => {
-        newSocket.disconnect();
-        setSocket(null);
-      };
-    }
-  }, [currentUser, setSocket]);
+    if (!currentUser) return;
 
+    // Initialize Socket
+    const newSocket = io(WS_BASE_URL);
+    setSocket(newSocket);
+
+    // Cleanup: Disconnect when currentUser changes or component unmounts
+    return () => {
+      newSocket.disconnect();
+      setSocket(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, setSocket]); 
+
+  // 2. SOCKET EVENT LISTENERS
   useEffect(() => {
     if (!socket || !currentUser) return;
 
     socket.emit("authenticate", currentUser.id);
 
-    const handleDmConfirm = ({
-      tempId,
-      message,
-    }: {
-      tempId: string;
-      message: MessageType;
-    }) => {
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === tempId ? message : msg)),
-      );
+    const handleDmConfirm = ({ tempId, message }: { tempId: string; message: MessageType }) => {
+      setMessages((prev) => prev.map((msg) => (msg.id === tempId ? message : msg)));
     };
 
     const handleDmReceive = (message: MessageType) => {
       const isSelected =
         selectedConversation?.type === "dm" &&
         selectedConversation.data.id === message.senderId;
-      if (isSelected) setMessages((prev) => [...prev, message]);
+
+      if (isSelected) {
+        setMessages((prev) => [...prev, message]);
+      }
 
       setDmConversations((prev) =>
         prev.map((convo) =>
@@ -86,25 +87,18 @@ export default function NetworkLayout({
                 lastMessageTimestamp: message.createdAt,
                 unseenCount: isSelected ? 0 : (convo.unseenCount || 0) + 1,
               }
-            : convo,
-        ),
+            : convo
+        )
       );
     };
 
-    const handleGroupReceive = ({
-      tempId,
-      message,
-    }: {
-      tempId: string;
-      message: MessageType;
-    }) => {
+    const handleGroupReceive = ({ tempId, message }: { tempId: string; message: MessageType }) => {
       const isSelected =
         selectedConversation?.type === "room" &&
         selectedConversation.data.id === message.roomId;
+
       if (message.senderId === currentUser.id) {
-        setMessages((prev) =>
-          prev.map((msg) => (msg.id === tempId ? message : msg)),
-        );
+        setMessages((prev) => prev.map((msg) => (msg.id === tempId ? message : msg)));
       } else if (isSelected) {
         setMessages((prev) => [...prev, message]);
       }
@@ -121,20 +115,12 @@ export default function NetworkLayout({
                     ? (room.unseenCount || 0) + 1
                     : room.unseenCount,
               }
-            : room,
-        ),
+            : room
+        )
       );
     };
 
-    const handleReactionUpdate = ({
-      action,
-      reaction,
-      messageId,
-    }: {
-      action: "added" | "removed";
-      reaction: Reaction;
-      messageId: string;
-    }) => {
+    const handleReactionUpdate = ({ action, reaction, messageId }: { action: "added" | "removed"; reaction: Reaction; messageId: string }) => {
       setMessages((prev) =>
         prev.map((msg) => {
           if (msg.id !== messageId) return msg;
@@ -143,7 +129,7 @@ export default function NetworkLayout({
               ? [...msg.reactions, reaction]
               : msg.reactions.filter((r) => r.id !== reaction.id);
           return { ...msg, reactions: newReactions };
-        }),
+        })
       );
     };
 
@@ -156,8 +142,8 @@ export default function NetworkLayout({
         prev.map((convo) =>
           convo.id === user.id
             ? { ...convo, isOnline: user.isOnline, lastSeen: user.lastSeen }
-            : convo,
-        ),
+            : convo
+        )
       );
     };
 
@@ -176,15 +162,9 @@ export default function NetworkLayout({
       socket.off("message:deleted", handleMessageDeleted);
       socket.off("user:status", handleUserStatus);
     };
-  }, [
-    socket,
-    currentUser,
-    setMessages,
-    selectedConversation,
-    setDmConversations,
-    setUserRooms,
-  ]);
+  }, [socket, currentUser, setMessages, selectedConversation, setDmConversations, setUserRooms]);
 
+  // 3. JOIN ROOMS
   useEffect(() => {
     if (socket && userRooms.length > 0) {
       const roomIds = userRooms.map((room) => room.id);
@@ -192,6 +172,7 @@ export default function NetworkLayout({
     }
   }, [socket, userRooms]);
 
+  // 4. INITIAL FETCH
   useEffect(() => {
     if (!currentUser) {
       setLoading({ key: "profile", value: false });
@@ -203,14 +184,10 @@ export default function NetworkLayout({
       setLoading({ key: "profile", value: true });
       setError(null);
       try {
-        const res = await fetch(
-          `${API_BASE_URL}/user/profile/${currentUser.username}`,
-        );
+        const res = await fetch(`${API_BASE_URL}/user/profile/${currentUser.username}`);
         if (!res.ok) throw new Error("Failed to fetch user profile");
         const profile: ChatUserProfile = await res.json();
-        setUserRooms(
-          profile.rooms?.map((room) => ({ ...room, unseenCount: 0 })) || [],
-        );
+        setUserRooms(profile.rooms?.map((room) => ({ ...room, unseenCount: room.unseenCount || 0 })) || []);
         setFollowingList(profile.following || []);
       } catch (err: any) {
         setError(err.message);
@@ -221,14 +198,10 @@ export default function NetworkLayout({
 
     const fetchDmConversations = async () => {
       try {
-        const res = await fetch(
-          `${API_BASE_URL}/chat/dm/conversations/${currentUser.id}`,
-        );
+        const res = await fetch(`${API_BASE_URL}/chat/dm/conversations/${currentUser.id}`);
         if (!res.ok) throw new Error("Failed to fetch DM conversations");
         const conversations: SimpleUser[] = await res.json();
-        setDmConversations(
-          conversations.map((convo) => ({ ...convo, unseenCount: 0 })),
-        );
+        setDmConversations(conversations.map((convo) => ({ ...convo, unseenCount: convo.unseenCount || 0 })));
       } catch (err: any) {
         setError(err.message);
       }
@@ -236,41 +209,30 @@ export default function NetworkLayout({
 
     fetchUserProfile();
     fetchDmConversations();
-  }, [
-    currentUser,
-    setLoading,
-    setError,
-    setUserRooms,
-    setFollowingList,
-    setDmConversations,
-  ]);
+  }, [currentUser, setLoading, setError, setUserRooms, setFollowingList, setDmConversations]);
 
   if (!currentUser && !isLoading.profile) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-black text-gray-400 z-50">
         <div className="text-center">
           <Loader2 className="w-8 h-8 mx-auto animate-spin text-indigo-500" />
-          <h1 className="mt-4 text-xl font-semibold text-gray-200">
-            Loading User...
-          </h1>
+          <h1 className="mt-4 text-xl font-semibold text-gray-200">Loading User...</h1>
         </div>
       </div>
     );
   }
 
   return (
-    // CHANGED: Removed "fixed inset-0". 
-    // Used "h-full w-full relative" to respect the RootLayout flex container.
     <div className="w-full h-full bg-black font-sans text-gray-200 flex overflow-hidden relative z-0">
+      {/* Desktop Sidebar - Always Visible on large screens */}
       <div className="hidden md:flex h-full w-1/3 lg:w-1/4 border-r border-zinc-800 flex-col">
         <NetworkSidebar />
       </div>
 
+      {/* Main Content Area - Handles Mobile logic via Page */}
       <div className="flex-grow h-full w-full md:w-2/3 lg:w-3/4 relative flex flex-col">
         {children}
       </div>
-
-      {isModalOpen && <NewChatModal />}
     </div>
   );
 }

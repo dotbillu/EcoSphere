@@ -1,7 +1,7 @@
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import { PrismaClient } from "@prisma/client";
-require('dotenv').config();
+require("dotenv").config();
 const prisma = new PrismaClient();
 const httpServer = createServer();
 
@@ -100,7 +100,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
       } catch (err) {
         console.error("Error sending DM:", err);
       }
-    }
+    },
   );
 
   // --- Group Message Handling ---
@@ -129,7 +129,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
       } catch (err) {
         console.error("Error sending group message:", err);
       }
-    }
+    },
   );
 
   // --- Reaction Handling ---
@@ -211,7 +211,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
       } catch (err) {
         console.error("Error toggling reaction:", err);
       }
-    }
+    },
   );
 
   // --- Delete Message Handling ---
@@ -253,32 +253,49 @@ io.on("connection", (socket: AuthenticatedSocket) => {
       } catch (err) {
         console.error("Error deleting message:", err);
       }
-    }
+    },
   );
 
   // --- Typing Indicators ---
   socket.on(
     "typing:start",
-    (data: { conversationId: string; isGroup: boolean; senderName: string }) => {
+    (data: {
+      conversationId: string;
+      isGroup: boolean;
+      senderName: string;
+    }) => {
       if (data.isGroup) {
         socket
           .to(data.conversationId)
-          .emit("user:typing", { conversationId: data.conversationId, name: data.senderName });
+          .emit("user:typing", {
+            conversationId: data.conversationId,
+            name: data.senderName,
+          });
       } else {
         socket
           .to(data.conversationId)
-          .emit("user:typing", { conversationId: socket.userId, name: data.senderName });
+          .emit("user:typing", {
+            conversationId: socket.userId,
+            name: data.senderName,
+          });
       }
-    }
+    },
   );
 
-  socket.on("typing:stop", (data: { conversationId: string; isGroup: boolean }) => {
-    if (data.isGroup) {
-      socket.to(data.conversationId).emit("user:stopped-typing", { conversationId: data.conversationId });
-    } else {
-      socket.to(data.conversationId).emit("user:stopped-typing", { conversationId: socket.userId });
-    }
-  });
+  socket.on(
+    "typing:stop",
+    (data: { conversationId: string; isGroup: boolean }) => {
+      if (data.isGroup) {
+        socket
+          .to(data.conversationId)
+          .emit("user:stopped-typing", { conversationId: data.conversationId });
+      } else {
+        socket
+          .to(data.conversationId)
+          .emit("user:stopped-typing", { conversationId: socket.userId });
+      }
+    },
+  );
 
   // --- Handle disconnect: Set user offline ---
   socket.on("disconnect", async () => {

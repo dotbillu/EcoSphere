@@ -150,3 +150,6 @@ export const isNewChatModalOpenAtom = atom<boolean>(false);
 
 export type NetworkFilter = "all" | "rooms" | "dms";
 export const networkFilterAtom = atom<NetworkFilter>("all");
+
+
+export const sidebarTransitionLoadingAtom = atom(false);

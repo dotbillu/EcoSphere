@@ -1,12 +1,11 @@
 import { Router } from "express";
-import { prisma } from "../lib/prisma";
-import { upload } from "../multer";
+import { prisma } from "@lib/prisma";
+import { upload } from "@multer";
 import type { Router as ExpressRouter } from "express";
 
 const router: ExpressRouter = Router();
 
-// --- Create Post ---
-// (No changes needed, this is good)
+// Route: POST /feedpost/uploadPosts
 router.post("/uploadPosts", upload.array("images", 5), async (req, res) => {
   try {
     const { username, name, content, location } = req.body;
@@ -35,6 +34,7 @@ router.post("/uploadPosts", upload.array("images", 5), async (req, res) => {
   }
 });
 
+// Route: GET /feedpost/posts (Global/All posts)
 router.get("/posts", async (req, res) => {
   const skip = parseInt(req.query.skip as string) || 0;
   const take = parseInt(req.query.take as string) || 5;
@@ -43,12 +43,11 @@ router.get("/posts", async (req, res) => {
     const posts = await prisma.post.findMany({
       skip,
       take,
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "desc" as const },
       include: {
         user: {
           select: { image: true },
         },
-        // Include the actual like and comment records
         likes: {
           select: {
             userId: true,
@@ -56,9 +55,9 @@ router.get("/posts", async (req, res) => {
         },
         comments: {
           orderBy: {
-            createdAt: "desc",
+            createdAt: "desc" as const,
           },
-          take: 3, // Only take the 3 most recent comments for the feed
+          take: 3,
           include: {
             user: {
               select: {
@@ -68,7 +67,6 @@ router.get("/posts", async (req, res) => {
             },
           },
         },
-        // Also include a total count, which is more efficient for the UI
         _count: {
           select: {
             likes: true,
@@ -85,18 +83,20 @@ router.get("/posts", async (req, res) => {
   }
 });
 
-// --- NEW: Fetch a Single Post by ID ---
+// Route: GET /feedpost/posts/:id
 router.get("/posts/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const post = await prisma.post.findUnique({
-      where: { id: parseInt(id) },
+      where: { id },
       include: {
         user: { select: { name: true, username: true, image: true } },
         likes: { include: { user: { select: { username: true } } } },
         comments: {
-          orderBy: { createdAt: "desc" },
-          include: { user: { select: { name: true, username: true, image: true } } },
+          orderBy: { createdAt: "desc" as const },
+          include: {
+            user: { select: { name: true, username: true, image: true } },
+          },
         },
         _count: { select: { likes: true, comments: true } },
       },
@@ -112,13 +112,11 @@ router.get("/posts/:id", async (req, res) => {
   }
 });
 
-
-// --- NEW: Like/Unlike a Post ---
+// Route: POST /feedpost/posts/:postId/like
 router.post("/posts/:postId/like", async (req, res) => {
-  console.log("like rquest ")
   try {
     const { postId } = req.params;
-    const { userId } = req.body; // You'll send this from the frontend
+    const { userId } = req.body;
 
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
@@ -127,24 +125,22 @@ router.post("/posts/:postId/like", async (req, res) => {
     const existingLike = await prisma.like.findUnique({
       where: {
         postId_userId: {
-          postId: parseInt(postId),
-          userId: parseInt(userId),
+          postId,
+          userId,
         },
       },
     });
 
     if (existingLike) {
-      // User has already liked the post, so unlike it
       await prisma.like.delete({
         where: { id: existingLike.id },
       });
       res.status(200).json({ message: "Post unliked" });
     } else {
-      // User has not liked the post, so like it
       await prisma.like.create({
         data: {
-          postId: parseInt(postId),
-          userId: parseInt(userId),
+          postId,
+          userId,
         },
       });
       res.status(200).json({ message: "Post liked" });
@@ -155,27 +151,29 @@ router.post("/posts/:postId/like", async (req, res) => {
   }
 });
 
-// --- NEW: Comment on a Post ---
+// Route: POST /feedpost/posts/:postId/comment
 router.post("/posts/:postId/comment", async (req, res) => {
   try {
     const { postId } = req.params;
     const { userId, content } = req.body;
 
     if (!userId || !content) {
-      return res.status(400).json({ message: "userId and content are required" });
+      return res
+        .status(400)
+        .json({ message: "userId and content are required" });
     }
 
     const newComment = await prisma.comment.create({
       data: {
         content,
-        postId: parseInt(postId),
-        userId: parseInt(userId),
+        postId,
+        userId,
       },
       include: {
         user: {
-            select: { name: true, username: true, image: true }
-        }
-      }
+          select: { name: true, username: true, image: true },
+        },
+      },
     });
 
     res.status(201).json(newComment);
@@ -185,32 +183,27 @@ router.post("/posts/:postId/comment", async (req, res) => {
   }
 });
 
-// --- NEW: Delete a Post ---
+// Route: DELETE /feedpost/posts/:postId
 router.delete("/posts/:postId", async (req, res) => {
-    try {
-        const { postId } = req.params;
+  try {
+    const { postId } = req.params;
 
-       
-        await prisma.like.deleteMany({
-            where: { postId: parseInt(postId) }
-        });
-        await prisma.comment.deleteMany({
-            where: { postId: parseInt(postId) }
-        });
+    await prisma.like.deleteMany({
+      where: { postId },
+    });
+    await prisma.comment.deleteMany({
+      where: { postId },
+    });
 
-        // Now, delete the post itself
-        await prisma.post.delete({
-            where: { id: parseInt(postId) }
-        });
+    await prisma.post.delete({
+      where: { id: postId },
+    });
 
-        res.status(200).json({ message: "Post deleted successfully" });
-
-    } catch (err) {
-        console.error("Error deleting post:", err);
-        res.status(500).json({ message: "Internal server error" });
-    }
+    res.status(200).json({ message: "Post deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting post:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
-
 export default router;
-

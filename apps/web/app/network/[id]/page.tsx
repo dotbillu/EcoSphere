@@ -7,9 +7,9 @@ import {
   userRoomsAtom,
   dmConversationsAtom,
   networkLoadingAtom,
-} from "@/store";
+} from "@/store"; // Fixed import path
 import ChatPanel from "../components/ChatPanel";
-import { ChatMapRoom, SimpleUser } from "@lib/types";
+import { ChatMapRoom, SimpleUser } from "@lib/types"; // Fixed import path
 
 export default function NetworkChatPage({
   params,
@@ -25,22 +25,30 @@ export default function NetworkChatPage({
   const [loading] = useAtom(networkLoadingAtom);
 
   useEffect(() => {
-    if (loading.profile || !userRooms || !dmConversations) return;
+    // Wait for profile to load
+    if (loading.profile) return;
+    
+    // Avoid redundant updates
     if (selectedConversation?.data.id === conversationId) return;
 
+    // Logic to find conversation in User's Lists
     let foundConvo: any = null;
     let foundType: "room" | "dm" | null = null;
 
-    const room = userRooms.find((r: ChatMapRoom) => r.id === conversationId);
-    if (room) {
-      foundConvo = room;
-      foundType = "room";
-    } else {
-      const dm = dmConversations.find((d: SimpleUser) => d.id === conversationId);
-      if (dm) {
-        foundConvo = dm;
-        foundType = "dm";
-      }
+    if (userRooms) {
+        const room = userRooms.find((r: ChatMapRoom) => r.id === conversationId);
+        if (room) {
+            foundConvo = room;
+            foundType = "room";
+        }
+    }
+
+    if (!foundConvo && dmConversations) {
+        const dm = dmConversations.find((d: SimpleUser) => d.id === conversationId);
+        if (dm) {
+            foundConvo = dm;
+            foundType = "dm";
+        }
     }
 
     if (foundConvo && foundType) {
@@ -58,6 +66,8 @@ export default function NetworkChatPage({
     setSelectedConversation,
   ]);
 
-  // On mobile, this page covers the screen. On desktop, it fills the flex-grow area.
+  // On this route, we just render the ChatPanel. 
+  // The Layout handles the Desktop Sidebar.
+  // On Mobile, this takes up the full screen.
   return <ChatPanel />;
 }

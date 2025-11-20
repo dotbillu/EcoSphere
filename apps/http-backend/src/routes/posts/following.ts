@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { prisma } from "../lib/prisma";
+import { prisma } from "@lib/prisma";
 import type { Router as ExpressRouter } from "express";
 
 const router: ExpressRouter = Router();
@@ -19,14 +19,12 @@ router.get("/feed", async (req, res) => {
   }
 
   try {
-    const currentUserId = userId as string; // No parseInt
+    const currentUserId = String(userId);
     const skipNum = parseInt(skip as string) || 0;
-    const takeNum = parseInt(take as string) || 10; // Default to 10 items
+    const takeNum = parseInt(take as string) || 10;
 
-    // No isNaN check needed, just check if it was provided (already done)
-    
     const user = await prisma.user.findUnique({
-      where: { id: currentUserId }, // ID is now a string
+      where: { id: currentUserId },
       include: {
         following: {
           select: { id: true, username: true },
@@ -38,16 +36,14 @@ router.get("/feed", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const followedUserIds = user.following.map((u) => u.id); // This is now string[]
-    const followedUsernames = user.following.map((u) => u.username);
+    const followedUserIds = user.following.map((u: any) => String(u.id));
+    const followedUsernames = user.following.map((u: any) => u.username);
 
     if (followedUserIds.length === 0) {
       return res.json({ items: [], hasNextPage: false });
     }
 
     let allItems: any[] = [];
-
-    // --- Conditionally fetch data based on filters ---
 
     if (filterPosts === "true") {
       const posts = await prisma.post.findMany({
@@ -62,7 +58,7 @@ router.get("/feed", async (req, res) => {
         },
       });
       allItems.push(
-        ...posts.map((item) => {
+        ...posts.map((item: any) => {
           const { createdAt, ...rest } = item;
           return {
             type: "post" as const,
@@ -76,7 +72,7 @@ router.get("/feed", async (req, res) => {
     if (filterGigs === "true") {
       const gigs = await prisma.gig.findMany({
         where: {
-          creatorId: { in: followedUserIds }, // Compares string[]
+          creatorId: { in: followedUserIds },
         },
         orderBy: { createdAt: "desc" },
         include: {
@@ -86,7 +82,7 @@ router.get("/feed", async (req, res) => {
         },
       });
       allItems.push(
-        ...gigs.map((item) => {
+        ...gigs.map((item: any) => {
           const { createdAt, date, expiresAt, ...rest } = item;
           return {
             type: "gig" as const,
@@ -105,7 +101,7 @@ router.get("/feed", async (req, res) => {
     if (filterRooms === "true") {
       const rooms = await prisma.mapRoom.findMany({
         where: {
-          creatorId: { in: followedUserIds }, // Compares string[]
+          creatorId: { in: followedUserIds },
         },
         orderBy: { createdAt: "desc" },
         include: {
@@ -115,7 +111,7 @@ router.get("/feed", async (req, res) => {
         },
       });
       allItems.push(
-        ...rooms.map((item) => {
+        ...rooms.map((item: any) => {
           const { createdAt, ...rest } = item;
           return {
             type: "room" as const,
@@ -129,10 +125,8 @@ router.get("/feed", async (req, res) => {
       );
     }
 
-    // Sort the combined list by date
     allItems.sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
 
-    // Apply pagination to the *final* sorted list
     const paginatedItems = allItems.slice(skipNum, skipNum + takeNum);
     const hasNextPage = allItems.length > skipNum + takeNum;
 

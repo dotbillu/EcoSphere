@@ -30,7 +30,7 @@ const toggleFollow = async ({
   currentUserId,
   targetUsername,
 }: {
-  currentUserId: string; // CHANGED: from number to string (UUID)
+  currentUserId: string; 
   targetUsername: string;
 }) => {
   const res = await fetch(`${API_BASE_URL}/user/follow`, {
@@ -48,10 +48,10 @@ const toggleLike = async ({
   userId,
   postId,
 }: {
-  userId: string; // CHANGED: from number to string (UUID)
-  postId: string; // CHANGED: from number to string (UUID)
+  userId: string; 
+  postId: string; 
 }) => {
-  const res = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
+  const res = await fetch(`${API_BASE_URL}/feed/posts/${postId}/like`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId }),
@@ -89,7 +89,6 @@ export default function Profile() {
   const isOwner = loggedInUser?.username === profile?.username;
 
   const isFollowing = useMemo(() => {
-    // Check if loggedInUser.id (string) is in profile.followers (array of objects with string id)
     if (!loggedInUser?.id || !profile?.followers) return false;
     return profile.followers.some((user) => user.id === loggedInUser.id);
   }, [profile?.followers, loggedInUser?.id]);
@@ -136,7 +135,7 @@ export default function Profile() {
 
   const handleLikeToggle = (postId: string) => {
     if (!loggedInUser?.id || !profile) return;
-    const currentUserId = loggedInUser.id; // string
+    const currentUserId = loggedInUser.id; 
     const queryKey = ["profile", usernameFromUrl];
 
     queryClient.setQueryData<UserProfile>(queryKey, (previousProfile) => {
@@ -145,9 +144,9 @@ export default function Profile() {
       return {
         ...previousProfile,
         posts: previousProfile.posts.map((post) => {
-          if (post.id === postId) { // Compare string IDs
+          if (post.id === postId) { 
             const isLiked = post.likes.some(
-              (like) => like.userId === currentUserId, // Compare string IDs
+              (like) => like.userId === currentUserId, 
             );
 
             const optimisticLikeEntry = { userId: currentUserId };
@@ -156,7 +155,7 @@ export default function Profile() {
               return {
                 ...post,
                 likes: post.likes.filter(
-                  (like) => like.userId !== currentUserId, // Compare string IDs
+                  (like) => like.userId !== currentUserId, 
                 ),
                 _count: { ...post._count, likes: post._count.likes - 1 },
               };

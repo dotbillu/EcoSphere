@@ -2,12 +2,11 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { SendHorizontal, Smile } from "lucide-react";
-import EmojiPicker, { EmojiClickData, Theme } from "emoji-picker-react";
+import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAtom } from "jotai";
-import { socketAtom } from "../layout"; 
-import { selectedConversationAtom, userAtom } from "@/store"; 
-import { ChatInputProps } from "./networktypes";
+import { socketAtom } from "../layout";
+import { selectedConversationAtom, userAtom } from "@/store";
 
 const INITIAL_WIDTH = 1000;
 const MAX_WIDTH_PERCENTAGE = 1;
@@ -19,6 +18,11 @@ const TEXTAREA_CLASS = `
   max-h-60 overflow-y-auto px-2 py-2
   [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
 `;
+
+interface ChatInputProps {
+  onSend: (content: string) => void;
+  onGetSendButtonPosition: (buttonElement: HTMLButtonElement) => void;
+}
 
 const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
@@ -141,7 +145,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2">
           <EmojiPicker
             onEmojiClick={onEmojiClick}
-            theme={Theme.DARK}
+            theme="dark"
             lazyLoadEmojis={true}
             height={400}
             width={350}
@@ -153,12 +157,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
         <motion.div
           layout
           animate={{ width: dynamicWidth }}
-          transition={{ type: "spring", stiffness: 500, damping: 100 }}
+          transition={{ type: "spring", stiffness: 400, damping: 35 }}
           className="flex items-end gap-2 bg-zinc-900 rounded-4xl p-2"
         >
           <button
             type="button"
-            className="shrink-0 w-10 h-10 mb-1 rounded-full text-gray-400 hover:text-gray-200 flex items-center justify-center transition-colors"
+            className="flex-shrink-0 w-10 h-10 mb-1 rounded-full text-gray-400 hover:text-gray-200 flex items-center justify-center transition-colors"
             onClick={() => setEmojiPickerOpen((prev) => !prev)}
           >
             <Smile size={20} />
@@ -174,8 +178,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 handleSubmit(e);
               }
             }}
-            placeholder="Start typing..."
-            className={`grow mb-1 w-full ${TEXTAREA_CLASS}`}
+            placeholder="Type a message..."
+            className={`flex-grow mb-1 w-full ${TEXTAREA_CLASS}`}
           />
 
           <AnimatePresence>
@@ -188,7 +192,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 exit={{ opacity: 0, scale: 0.7, width: 0 }}
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 type="submit"
-                className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center 
+                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center 
                                  transition-colors duration-200 ease-out
                                  bg-indigo-600 hover:bg-indigo-700 text-white
                                  mb-1`}
