@@ -1,4 +1,4 @@
-## EcoSphere
+## Slyme
 
 A modern, location-based social platform built with **Next.js**, **Leaflet.js**, and **Node.js**.
 Users can upload gigs to earn money, create rooms on the map, and interact through a social feed inspired by Twitter.
