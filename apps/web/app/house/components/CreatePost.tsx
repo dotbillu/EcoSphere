@@ -5,8 +5,9 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { Image as LucideImage, MapPin, X } from "lucide-react";
 import { useAtom } from "jotai";
-import { userAtom, locationAtom, type Post } from "@/store";
+import { userAtom, locationAtom } from "@/store";
 import { API_BASE_URL } from "@/lib/constants";
+import { Post } from "@/lib/types";
 
 interface CreatePostProps {
   onPostCreated: (newPost: Post) => void;
@@ -153,7 +154,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     >
       {error && <p className="text-red-500 text-sm">{error}</p>}
       <div className="flex gap-3">
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           {user.image ? (
             <Image
               src={

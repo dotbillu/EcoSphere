@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
   MapPin,
   ChevronDown,
@@ -17,7 +16,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { getImageUrl } from "@lib/utils";
-import { ActivityItemGig, ActivityItemRoom } from "../types";
+import { ActivityItemGig, ActivityItemRoom } from "@/lib/types";
 
 // -----------------------------------------------------------------------------
 // Sub-Component: DescriptionExpander
@@ -35,7 +34,7 @@ const DescriptionExpander = ({ content }: { content: string }) => {
   return (
     <div className="mt-2">
       <p
-        className={`text-zinc-200 whitespace-pre-wrap break-words ${
+        className={`text-zinc-200 whitespace-pre-wrap wrap-break-words ${
           shouldShowButton ? lineClampClass : ""
         }`}
       >
@@ -141,7 +140,7 @@ const GigRoomEntry = React.forwardRef<HTMLDivElement, GigRoomEntryProps>(
           className="flex space-x-3 p-4 border-b border-zinc-700 cursor-pointer hover:bg-zinc-900/50 transition-colors duration-200"
         >
           {/* Avatar */}
-          <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
             <Link href={profileUrl}>
               {author.image ? (
                 <Image
@@ -185,14 +184,14 @@ const GigRoomEntry = React.forwardRef<HTMLDivElement, GigRoomEntryProps>(
                 </p>
               </div>
               {locationDisplay && (
-                <div className="flex items-center gap-1 text-zinc-500 text-sm flex-shrink-0 ml-2 mt-1">
+                <div className="flex items-center gap-1 text-zinc-500 text-sm shrink-0 ml-2 mt-1">
                   <MapPin size={14} />
                   <span>{locationDisplay}</span>
                 </div>
               )}
             </div>
 
-            <p className="text-white mt-1 font-bold whitespace-pre-wrap break-words text-lg">
+            <p className="text-white mt-1 font-bold whitespace-pre-wrap wrap-break-words text-lg">
               {title}
             </p>
 
@@ -217,7 +216,7 @@ const GigRoomEntry = React.forwardRef<HTMLDivElement, GigRoomEntryProps>(
                     <span className="font-medium">Date:</span>
                     <span>
                       {new Date(
-                        (data as ActivityItemGig["data"]).date,
+                        (data as ActivityItemGig["data"]).createdAt,
                       ).toLocaleDateString()}
                     </span>
                   </div>
@@ -276,14 +275,14 @@ const GigRoomEntry = React.forwardRef<HTMLDivElement, GigRoomEntryProps>(
             onClick={closeModal}
           >
             <button
-              className="absolute top-4 right-4 text-white z-[60] p-2"
+              className="absolute top-4 right-4 text-white z-60 p-2"
               onClick={closeModal}
             >
               <X size={32} />
             </button>
             {imageUrls.length > 1 && (
               <button
-                className="absolute left-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
+                className="absolute left-4 p-2 bg-black/50 rounded-full text-white z-60 hover:bg-black/80 transition-colors"
                 onClick={showPrevImage}
               >
                 <ChevronLeft size={32} />
@@ -305,7 +304,7 @@ const GigRoomEntry = React.forwardRef<HTMLDivElement, GigRoomEntryProps>(
             </div>
             {imageUrls.length > 1 && (
               <button
-                className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
+                className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-60 hover:bg-black/80 transition-colors"
                 onClick={showNextImage}
               >
                 <ChevronRight size={32} />

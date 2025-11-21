@@ -14,6 +14,12 @@
       "@lib/*": [
         "./app/lib/*"
       ],
+      "@types": [
+        "./app/lib/types.ts"
+      ],
+      "@store": [
+        "./app/store.ts"
+      ],
       "@shared/*": [
         "./app/shared/*"
       ],

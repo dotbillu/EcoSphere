@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Filter } from "lucide-react";
 import { useAtom } from "jotai";
-import { userAtom, type Post, type UserProfile } from "@/store";
 import {
   useInfiniteQuery,
   useMutation,
   useQueryClient,
   useQuery,
+  InfiniteData,
 } from "@tanstack/react-query";
 import { API_BASE_URL } from "@/lib/constants";
 
@@ -18,13 +18,20 @@ import { API_BASE_URL } from "@/lib/constants";
 import CreatePost from "./CreatePost";
 import PostEntry from "./PostEntry";
 import GigRoomEntry from "./GigRoomEntry";
+import {
+  ActivityItem,
+  ActivityItemPost,
+  FeedPage,
+  FilterState,
+  Post,
+  UserProfile,
+} from "@types";
+import { userAtom } from "@/store";
 
-// Types
-import { FilterState, FeedPage, ActivityItem } from "../housetypes";
-
-// -----------------------------------------------------------------------------
-// API Helper Functions
-// -----------------------------------------------------------------------------
+type LikeMutationContext = {
+  previousActivity: unknown;
+  queryKey: (string | number | boolean | FilterState)[];
+};
 
 const fetchGlobalActivity = async ({
   pageParam = 0,
@@ -117,12 +124,12 @@ const FilterToggle = ({
   checked: boolean;
   onChange: () => void;
 }) => (
-  <label className="flex items-center space-x-2 cursor-pointer text-sm text-white hover:text-white-400 transition-colors">
+  <label className="flex items-center space-x-2 cursor-pointer text-sm text-white hover:text-zinc-300 transition-colors">
     <input
       type="checkbox"
       checked={checked}
       onChange={onChange}
-      className="form-checkbox h-4 w-4 rounded bg-zinc-700 border-zinc-600 text-white-500 focus:ring-white-500"
+      className="form-checkbox h-4 w-4 rounded bg-zinc-700 border-zinc-600 text-white focus:ring-white focus:ring-offset-zinc-900"
     />
     <span>{label}</span>
   </label>
@@ -174,7 +181,7 @@ export default function Feedbox() {
   };
 
   // Queries
-  const { data: loggedInUserProfile } = useQuery<UserProfile>({
+  useQuery<UserProfile>({
     queryKey: ["profile", user?.username],
     queryFn: () => fetchProfile(user!.username),
     enabled: !!user?.username,
@@ -211,17 +218,20 @@ export default function Feedbox() {
   });
 
   const feedItems = activityData?.pages.flatMap((page) => page.items) ?? [];
-
-  // Mutations & Actions
   const likeMutation = useMutation({
     mutationFn: toggleLike,
-    onMutate: async ({ postId, currentUserId }) => {
+    onMutate: async ({ currentUserId }) => {
       await queryClient.cancelQueries({ queryKey: ["activity"] });
-      const queryKey = ["activity", feedMode, currentUserId, filters];
+      const queryKey = [
+        "activity",
+        feedMode,
+        currentUserId,
+        JSON.stringify(filters),
+      ];
       const previousActivity = queryClient.getQueryData(queryKey);
       return { previousActivity, queryKey };
     },
-    onError: (err, variables, context: any) => {
+    onError: (err, variables, context: LikeMutationContext | undefined) => {
       if (context?.previousActivity) {
         queryClient.setQueryData(context.queryKey, context.previousActivity);
       }
@@ -241,25 +251,22 @@ export default function Feedbox() {
 
   const handleLikeToggle = (postId: string) => {
     if (!currentUserId) return;
-    const queryKey = ["activity", feedMode, currentUserId, filters];
 
-    // Optimistic Update
-    queryClient.setQueryData<any>(queryKey, (oldData) => {
-      if (!oldData) return;
+    const queryKey = ["activity", feedMode, currentUserId, filters];
+    queryClient.setQueryData<InfiniteData<FeedPage>>(queryKey, (oldData) => {
+      if (!oldData) return oldData;
+
       return {
         ...oldData,
-        pages: oldData.pages.map((page: FeedPage) => ({
+        pages: oldData.pages.map((page) => ({
           ...page,
           items: page.items.map((item) => {
             if (item.type === "post" && item.data.id === postId) {
               const post = item.data as Post;
               const isLiked = post.likes.some(
-                (like: any) => like.userId === currentUserId,
+                (like: { userId: string }) => like.userId === currentUserId,
               );
-              const optimisticLikeEntry = {
-                userId: currentUserId,
-                postId: postId,
-              };
+              const optimisticLikeEntry = { userId: currentUserId };
 
               if (isLiked) {
                 return {
@@ -267,11 +274,15 @@ export default function Feedbox() {
                   data: {
                     ...post,
                     likes: post.likes.filter(
-                      (like: any) => like.userId !== currentUserId,
+                      (like: { userId: string }) =>
+                        like.userId !== currentUserId,
                     ),
-                    _count: { ...post._count, likes: post._count.likes - 1 },
+                    _count: {
+                      ...post._count,
+                      likes: Math.max(0, post._count.likes - 1),
+                    },
                   },
-                };
+                } as ActivityItemPost;
               } else {
                 return {
                   ...item,
@@ -280,16 +291,16 @@ export default function Feedbox() {
                     likes: [...post.likes, optimisticLikeEntry],
                     _count: { ...post._count, likes: post._count.likes + 1 },
                   },
-                };
+                } as ActivityItemPost;
               }
             }
+
             return item;
           }),
         })),
       };
     });
 
-    // Debounced Mutation
     if (likeDebounceTimer.current) {
       clearTimeout(likeDebounceTimer.current);
     }
@@ -297,7 +308,7 @@ export default function Feedbox() {
       likeMutation.mutate({ postId, currentUserId });
     }, 1000);
   };
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleFollowToggle = (targetUsername: string) => {
     if (!currentUserId) return;
     followMutation.mutate({ currentUserId, targetUsername });
@@ -339,7 +350,7 @@ export default function Feedbox() {
     router.push(`/map?${type}Id=${id}`);
   };
 
-  // Infinite Scroll Observer
+  // Infinite Scroll
   const lastItemRef = useCallback(
     (node: HTMLDivElement | null) => {
       if (isFetchingNextPage) return;
@@ -364,15 +375,9 @@ export default function Feedbox() {
           key={`post-${item.data.id}`}
           ref={ref}
           post={item.data}
-          currentUserId={currentUserId}
-          // @ts-ignore
-          loggedInUser={loggedInUserProfile}
-          // @ts-ignore
-          followingList={loggedInUserProfile?.following}
+          currentUserId={currentUserId || ""}
           onLikeToggle={handleLikeToggle}
           onNavigate={handleNavigateToPost}
-          // @ts-ignore
-          onFollowToggle={handleFollowToggle}
           onPrefetchProfile={handlePrefetchProfile}
           onPrefetchPost={handlePrefetchPost}
         />
@@ -399,7 +404,7 @@ export default function Feedbox() {
             onClick={() => setFeedMode("global")}
             className={`py-3 text-sm font-bold transition-colors w-full border-b-4 ${
               feedMode === "global"
-                ? "text-white-500 border-white-500"
+                ? "text-white border-white"
                 : "text-zinc-400 border-transparent hover:bg-zinc-900"
             } cursor-pointer`}
           >
@@ -409,7 +414,7 @@ export default function Feedbox() {
             onClick={() => setFeedMode("network")}
             className={`py-3 text-sm font-bold transition-colors w-full border-b-4 ${
               feedMode === "network"
-                ? "text-white-500 border-white-500"
+                ? "text-white border-white"
                 : "text-zinc-400 border-transparent hover:bg-zinc-900"
             } cursor-pointer`}
           >
@@ -444,7 +449,9 @@ export default function Feedbox() {
       )}
 
       {!isLoading && !hasNextPage && feedItems.length > 0 && (
-        <p className="text-zinc-500 text-center p-4">You've reached the end</p>
+        <p className="text-zinc-500 text-center p-4 text-sm">
+          You&apos;ve reached the end
+        </p>
       )}
 
       {!isLoading && !isFetchingNextPage && feedItems.length === 0 && (
@@ -458,22 +465,25 @@ export default function Feedbox() {
         className="fixed bottom-5 z-50"
         ref={filterMenuRef}
         style={{ right: `max(1.25rem, calc((100vw - 672px) / 2))` }}
-        onClick={() => setIsFilterOpen(true)}
       >
         <button
-          onClick={() => setIsFilterOpen(!isFilterOpen)}
-          className="flex items-center space-x-1 p-3 rounded-full text-white bg-black-600 hover:bg-zinc-900 transition-colors shadow shadow-white cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsFilterOpen(!isFilterOpen);
+          }}
+          className="flex items-center justify-center w-12 h-12 rounded-full text-white bg-zinc-800 hover:bg-zinc-700 transition-colors shadow-lg border border-zinc-700"
         >
-          <Filter size={22} />
+          <Filter size={20} />
         </button>
 
         <AnimatePresence>
           {isFilterOpen && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-full right-0 mb-4 w-48 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl z-50 p-4"
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="absolute bottom-full right-0 mb-4 w-48 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 p-4"
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col space-y-3">
                 <FilterToggle

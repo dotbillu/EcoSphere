@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { getImageUrl } from "../../../lib/utils";
+import { getImageUrl } from "@lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 
 type LightboxProps = {

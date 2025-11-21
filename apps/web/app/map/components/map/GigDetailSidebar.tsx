@@ -20,7 +20,7 @@ import { useState } from "react";
 import { getImageUrl, haversineDistance } from "@/lib/utils";
 import { GigElement, MapElement } from "./MapTypes";
 import { motion } from "framer-motion";
-import { User as UserType } from "@/store";
+import { User as UserType } from "@types";
 import LinkNext from "next/link";
 
 type GigDetailSidebarProps = {

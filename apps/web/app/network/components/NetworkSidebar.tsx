@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
@@ -9,13 +8,15 @@ import { useAtom, useSetAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
 import { Search, Pencil, X } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLiveQuery } from "dexie-react-hooks";
 import {
   ConversationItemProps,
   ConversationListProps,
   ChatMapRoom,
   SimpleUser,
-} from "./networktypes";
+} from "@types";
 import { API_BASE_URL } from "@/lib/constants";
+import { db } from "@/lib/db"; // Ensure this path matches where you created db.ts
 import {
   userAtom,
   userRoomsAtom,
@@ -260,6 +261,7 @@ const NewChatModal: React.FC = () => {
           <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-gray-700"
+            id="close-new-chat"
           >
             <X size={20} />
           </button>
@@ -307,22 +309,54 @@ export default function NetworkSidebar() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const searchBarRef = useRef<HTMLDivElement>(null);
+  
   const [user] = useAtom(userAtom);
   const [userRooms] = useAtom(userRoomsAtom);
   const [dmConversations] = useAtom(dmConversationsAtom);
+  
   const [loading] = useAtom(networkLoadingAtom);
   const [error] = useAtom(networkErrorAtom);
+  
   const setIsModalOpen = useSetAtom(isNewChatModalOpenAtom);
   const [isModalOpen] = useAtom(isNewChatModalOpenAtom);
   const [isTransitioning] = useAtom(sidebarTransitionLoadingAtom);
   const queryClient = useQueryClient();
 
+  // 1. Live Query from Dexie (Local Source of Truth)
+  // This returns [] initially, but populates very quickly from IndexedDB
+  const localRooms = useLiveQuery(() => db.rooms.toArray(), []) || [];
+  const localDms = useLiveQuery(() => db.dms.toArray(), []) || [];
+
+  // 2. Sync Effects: When Network Atoms update, update Dexie
+  // We use bulkPut to update existing or add new records
+  useEffect(() => {
+    if (userRooms.length > 0) {
+      db.rooms.bulkPut(userRooms).catch((err) => 
+        console.error("Failed to sync rooms to cache", err)
+      );
+    }
+  }, [userRooms]);
+
+  useEffect(() => {
+    if (dmConversations.length > 0) {
+      db.dms.bulkPut(dmConversations).catch((err) => 
+        console.error("Failed to sync DMs to cache", err)
+      );
+    }
+  }, [dmConversations]);
+
+  // 3. Determine what to display
+  // If network data (atoms) is available, use it (it's freshest).
+  // If not, fall back to local Dexie data (it's fast).
+  const displayRooms = userRooms.length > 0 ? userRooms : localRooms;
+  const displayDms = dmConversations.length > 0 ? dmConversations : localDms;
+
   const combinedAndSortedConversations = useMemo(() => {
-    const roomsWithType = userRooms.map((room) => ({
+    const roomsWithType = displayRooms.map((room) => ({
       ...room,
       type: "room" as const,
     }));
-    const dmsWithType = dmConversations.map((dm) => ({
+    const dmsWithType = displayDms.map((dm) => ({
       ...dm,
       type: "dm" as const,
     }));
@@ -334,8 +368,9 @@ export default function NetworkSidebar() {
         new Date(a.lastMessageTimestamp).getTime()
       );
     });
-  }, [userRooms, dmConversations]);
+  }, [displayRooms, displayDms]);
 
+  // Prefetch logic
   useEffect(() => {
     if (user && (userRooms.length > 0 || dmConversations.length > 0)) {
       const conversations = [
@@ -373,6 +408,14 @@ export default function NetworkSidebar() {
 
   const isExpanded = isFocused || searchTerm.length > 0;
 
+  // 4. Render Condition
+  // Show Skeleton ONLY if:
+  // (We are loading profile AND we have no local data to show yet) OR (We are transitioning sidebar)
+  // If we have local data (combinedAndSortedConversations > 0), show it even if profile is loading.
+  const shouldShowSkeleton = 
+    (loading.profile && combinedAndSortedConversations.length === 0) || 
+    isTransitioning;
+
   return (
     <div className="flex flex-col w-full h-full bg-black border-r border-zinc-800 mt-2 relative">
       {isModalOpen && <NewChatModal />}
@@ -409,13 +452,14 @@ export default function NetworkSidebar() {
         <button
           onClick={() => setIsModalOpen(true)}
           className="p-2 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors flex-shrink-0"
+          id="new-chat-btn"
         >
           <Pencil size={20} />
         </button>
       </div>
 
       <div className="flex-grow overflow-y-auto custom-scrollbar px-2 mt-4">
-        {loading.profile || isTransitioning ? (
+        {shouldShowSkeleton ? (
           <SidebarSkeleton />
         ) : (
           !error && (

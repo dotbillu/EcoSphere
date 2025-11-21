@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { MapRoom } from "../../store";
+import { MapRoom } from "@/lib/types"; 
 import { getImageUrl } from "../../lib/utils";
 import Link from "next/link";
 

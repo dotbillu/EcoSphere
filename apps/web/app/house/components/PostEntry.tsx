@@ -14,7 +14,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { getImageUrl } from "@lib/utils";
-import { PostEntryProps } from "../housetypes";
+import { PostEntryProps } from "@/lib/types";
 
 const PostEntry = forwardRef<
   HTMLDivElement,
@@ -39,7 +39,7 @@ const PostEntry = forwardRef<
     const [modalImageIndex, setModalImageIndex] = useState(0);
 
     const isLikedByCurrentUser = post.likes.some(
-      (like) => like.userId === currentUserId,
+      (likes) => likes.userId === currentUserId,
     );
 
     useEffect(() => {
@@ -77,8 +77,11 @@ const PostEntry = forwardRef<
     const renderImageGrid = () => {
       const count = post.imageUrls.length;
       if (count === 0) return null;
+
       const gridBase =
         "relative w-full max-w-xl h-80 rounded-2xl overflow-hidden mt-3 border border-zinc-700";
+
+      // 1 Image: Full width/height
       if (count === 1) {
         return (
           <div
@@ -89,11 +92,14 @@ const PostEntry = forwardRef<
               src={getImageUrl(post.imageUrls[0])}
               alt="Post image"
               fill
+              className="hover:opacity-90 transition-opacity"
               style={{ objectFit: "cover" }}
             />
           </div>
         );
       }
+
+      // 2 Images: Split vertically
       if (count === 2) {
         return (
           <div className={`${gridBase} grid grid-cols-2 gap-0.5`}>
@@ -107,6 +113,7 @@ const PostEntry = forwardRef<
                   src={getImageUrl(url)}
                   alt={`Post image ${index + 1}`}
                   fill
+                  className="hover:opacity-90 transition-opacity"
                   style={{ objectFit: "cover" }}
                 />
               </div>
@@ -114,62 +121,75 @@ const PostEntry = forwardRef<
           </div>
         );
       }
+
+      // 3 Images: 1 Left (large), 2 Right (stacked)
       if (count === 3) {
         return (
-          <div className={`${gridBase} grid grid-cols-2 grid-rows-2 gap-0.5`}>
+          <div className={`${gridBase} grid grid-cols-2 gap-0.5`}>
             <div
-              className="relative row-span-2 cursor-pointer"
+              className="relative h-full cursor-pointer"
               onClick={(e) => openModal(e, 0)}
             >
               <Image
                 src={getImageUrl(post.imageUrls[0])}
                 alt="Post image 1"
                 fill
+                className="hover:opacity-90 transition-opacity"
                 style={{ objectFit: "cover" }}
               />
             </div>
-            <div
-              className="relative col-start-2 cursor-pointer"
-              onClick={(e) => openModal(e, 1)}
-            >
-              <Image
-                src={getImageUrl(post.imageUrls[1])}
-                alt="Post image 2"
-                fill
-                style={{ objectFit: "cover" }}
-              />
-            </div>
-            <div
-              className="relative col-start-2 row-start-2 cursor-pointer"
-              onClick={(e) => openModal(e, 2)}
-            >
-              <Image
-                src={getImageUrl(post.imageUrls[2])}
-                alt="Post image 3"
-                fill
-                style={{ objectFit: "cover" }}
-              />
+            <div className="grid grid-rows-2 gap-0.5 h-full">
+              <div
+                className="relative h-full cursor-pointer"
+                onClick={(e) => openModal(e, 1)}
+              >
+                <Image
+                  src={getImageUrl(post.imageUrls[1])}
+                  alt="Post image 2"
+                  fill
+                  className="hover:opacity-90 transition-opacity"
+                  style={{ objectFit: "cover" }}
+                />
+              </div>
+              <div
+                className="relative h-full cursor-pointer"
+                onClick={(e) => openModal(e, 2)}
+              >
+                <Image
+                  src={getImageUrl(post.imageUrls[2])}
+                  alt="Post image 3"
+                  fill
+                  className="hover:opacity-90 transition-opacity"
+                  style={{ objectFit: "cover" }}
+                />
+              </div>
             </div>
           </div>
         );
       }
+
+      // 4+ Images: 2x2 Grid
       return (
         <div className={`${gridBase} grid grid-cols-2 grid-rows-2 gap-0.5`}>
           {post.imageUrls.slice(0, 4).map((url, index) => (
             <div
               key={index}
-              className="relative h-full cursor-pointer"
+              className="relative h-full cursor-pointer group"
               onClick={(e) => openModal(e, index)}
             >
               <Image
                 src={getImageUrl(url)}
                 alt={`Post image ${index + 1}`}
                 fill
+                className="hover:opacity-90 transition-opacity"
                 style={{ objectFit: "cover" }}
               />
+              {/* Overlay for the 4th image if there are more than 4 images */}
               {count > 4 && index === 3 && (
-                <div className="absolute inset-0 bg-black flex items-center justify-center text-white text-2xl font-bold">
-                  +{count - 4}
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center group-hover:bg-black/50 transition-colors">
+                  <span className="text-white text-2xl font-bold">
+                    +{count - 4}
+                  </span>
                 </div>
               )}
             </div>
@@ -193,7 +213,7 @@ const PostEntry = forwardRef<
         }}
         className="flex space-x-3 p-4 border-b border-zinc-700 cursor-pointer hover:bg-zinc-900/50 transition-colors duration-200"
       >
-        <div className="flex-shrink-0" onClick={stopPropagation}>
+        <div className="shrink-0" onClick={stopPropagation}>
           <Link href={`/profile/${post.username}`}>
             {post.user?.image ? (
               <Image
@@ -243,7 +263,7 @@ const PostEntry = forwardRef<
             </div>
 
             {post.location && (
-              <p className="text-zinc-400 text-sm flex items-center gap-1 flex-shrink-0 ml-2">
+              <p className="text-zinc-400 text-sm flex items-center gap-1 shrink-0 ml-2">
                 <MapPin size={16} />
                 {post.location}
               </p>
@@ -252,7 +272,7 @@ const PostEntry = forwardRef<
 
           <p
             ref={contentRef}
-            className={`text-white mt-1 whitespace-pre-wrap break-words ${
+            className={`text-white mt-1 whitespace-pre-wrap wrap-break-words ${
               !isExpanded ? "line-clamp-8" : ""
             }`}
           >
@@ -318,14 +338,14 @@ const PostEntry = forwardRef<
             onClick={closeModal}
           >
             <button
-              className="absolute top-4 right-4 text-white z-[60] p-2"
+              className="absolute top-4 right-4 text-white z-60 p-2 hover:bg-white/10 rounded-full transition-colors"
               onClick={closeModal}
             >
               <X size={32} />
             </button>
             {post.imageUrls.length > 1 && (
               <button
-                className="absolute left-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
+                className="absolute left-4 p-2 bg-white/10 rounded-full text-white z-60 hover:bg-white/20 transition-colors"
                 onClick={showPrevImage}
               >
                 <ChevronLeft size={32} />
@@ -344,7 +364,7 @@ const PostEntry = forwardRef<
             </div>
             {post.imageUrls.length > 1 && (
               <button
-                className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
+                className="absolute right-4 p-2 bg-white/10 rounded-full text-white z-60 hover:bg-white/20 transition-colors"
                 onClick={showNextImage}
               >
                 <ChevronRight size={32} />

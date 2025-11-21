@@ -1,15 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, forwardRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
 
-// Animation
 import { motion, AnimatePresence } from "framer-motion";
 
-// Icons (Aliased Image to avoid conflict with Next.js Image)
 import {
   Image as LucideImage,
   MapPin,
@@ -26,19 +23,11 @@ import {
   ChevronUp,
   Heart,
   MessageCircle,
+  Music,
 } from "lucide-react";
 
 // State Management
 import { useAtom } from "jotai";
-import {
-  userAtom,
-  locationAtom,
-  type Post,
-  type UserProfile,
-  type Gig,
-  type MapRoom,
-  type Following,
-} from "@/store"; // Adjust path as needed
 
 // Data Fetching
 import {
@@ -46,6 +35,7 @@ import {
   useMutation,
   useQueryClient,
   useQuery,
+  InfiniteData,
 } from "@tanstack/react-query";
 
 // Utils & Constants
@@ -54,12 +44,26 @@ import { getImageUrl } from "@lib/utils"; // Adjust path as needed
 
 // External Components
 import ProfilePage from "@shared/profilePage"; // Adjust path as needed
+import {
+  ActivityItem,
+  ActivityItemGig,
+  ActivityItemPost,
+  ActivityItemRoom,
+  FeedPage,
+  FilterState,
+  Post,
+  PostEntryProps,
+  UserProfile,
+} from "@/lib/types";
+import { locationAtom, userAtom } from "@/store";
 
 // -----------------------------------------------------------------------------
 // Types & Interfaces
 // -----------------------------------------------------------------------------
-
-
+type LikeMutationContext = {
+  previousActivity: unknown;
+  queryKey: (string | number | boolean | FilterState)[];
+};
 
 // -----------------------------------------------------------------------------
 // API Helper Functions
@@ -179,7 +183,7 @@ const DescriptionExpander = ({ content }: { content: string }) => {
   return (
     <div className="mt-2">
       <p
-        className={`text-zinc-200 whitespace-pre-wrap break-words ${shouldShowButton ? lineClampClass : ""}`}
+        className={`text-zinc-200 whitespace-pre-wrap wrap-break-words ${shouldShowButton ? lineClampClass : ""}`}
       >
         {content}
       </p>
@@ -352,7 +356,7 @@ function CreatePost({
     >
       {error && <p className="text-red-500 text-sm">{error}</p>}
       <div className="flex gap-3">
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           {user.image ? (
             <Image
               src={
@@ -670,7 +674,7 @@ const PostEntry = React.forwardRef<
             </div>
 
             {post.location && (
-              <p className="text-zinc-400 text-sm flex items-center gap-1 flex-shrink-0 ml-2">
+              <p className="text-zinc-400 text-sm flex items-center gap-1 shrink-0 ml-2">
                 <MapPin size={16} />
                 {post.location}
               </p>
@@ -679,7 +683,7 @@ const PostEntry = React.forwardRef<
 
           <p
             ref={contentRef}
-            className={`text-white mt-1 whitespace-pre-wrap break-words ${
+            className={`text-white mt-1 whitespace-pre-wrap wrap-break-words ${
               !isExpanded ? "line-clamp-8" : ""
             }`}
           >
@@ -745,20 +749,23 @@ const PostEntry = React.forwardRef<
             onClick={closeModal}
           >
             <button
-              className="absolute top-4 right-4 text-white z-[60] p-2"
+              className="absolute top-4 right-4 text-white z-60 p-2"
               onClick={closeModal}
             >
               <X size={32} />
             </button>
             {post.imageUrls.length > 1 && (
               <button
-                className="absolute left-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
+                className="absolute left-4 p-2 bg-black/50 rounded-full text-white z-60 hover:bg-black/80 transition-colors"
                 onClick={showPrevImage}
               >
                 <ChevronLeft size={32} />
               </button>
             )}
-            <div className="relative w-[90vw] h-[90vh]" onClick={stopPropagation}>
+            <div
+              className="relative w-[90vw] h-[90vh]"
+              onClick={stopPropagation}
+            >
               <Image
                 src={getImageUrl(post.imageUrls[modalImageIndex])}
                 alt="Post image expanded"
@@ -768,7 +775,7 @@ const PostEntry = React.forwardRef<
             </div>
             {post.imageUrls.length > 1 && (
               <button
-                className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
+                className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-60 hover:bg-black/80 transition-colors"
                 onClick={showNextImage}
               >
                 <ChevronRight size={32} />
@@ -788,7 +795,7 @@ PostEntry.displayName = "PostEntry";
 
 function Feedbox() {
   const [user] = useAtom(userAtom);
-  const currentUserId = user?.id;
+  const currentUserId = user!.id;
   const router = useRouter();
   const queryClient = useQueryClient();
   const observer = useRef<IntersectionObserver | null>(null);
@@ -867,7 +874,6 @@ function Feedbox() {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
-    isError,
   } = useInfiniteQuery({
     queryKey: ["activity", feedMode, currentUserId, filters],
     queryFn: ({ pageParam }) => {
@@ -895,22 +901,21 @@ function Feedbox() {
 
   const likeMutation = useMutation({
     mutationFn: toggleLike,
-    onMutate: async ({ postId, currentUserId }) => {
+    onMutate: async ({ currentUserId }) => {
       await queryClient.cancelQueries({ queryKey: ["activity"] });
-
-      const queryKey = ["activity", feedMode, currentUserId, filters];
+      const queryKey = [
+        "activity",
+        feedMode,
+        currentUserId,
+        JSON.stringify(filters),
+      ];
       const previousActivity = queryClient.getQueryData(queryKey);
-
       return { previousActivity, queryKey };
     },
-    onError: (err, variables, context: any) => {
+    onError: (err, variables, context: LikeMutationContext | undefined) => {
       if (context?.previousActivity) {
-        queryClient.setQueryData(
-          context.queryKey,
-          context.previousActivity
-        );
+        queryClient.setQueryData(context.queryKey, context.previousActivity);
       }
-      console.error("Like toggle failed:", err);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["activity"] });
@@ -927,31 +932,38 @@ function Feedbox() {
 
   const handleLikeToggle = (postId: string) => {
     if (!currentUserId) return;
-    const queryKey = ["activity", feedMode, currentUserId, filters];
 
-    queryClient.setQueryData<any>(queryKey, (oldData) => {
-      if (!oldData) return;
+    const queryKey = ["activity", feedMode, currentUserId, filters];
+    queryClient.setQueryData<InfiniteData<FeedPage>>(queryKey, (oldData) => {
+      if (!oldData) return oldData;
 
       return {
         ...oldData,
-        pages: oldData.pages.map((page: FeedPage) => ({
+        pages: oldData.pages.map((page) => ({
           ...page,
           items: page.items.map((item) => {
             if (item.type === "post" && item.data.id === postId) {
               const post = item.data as Post;
-              const isLiked = post.likes.some((like: any) => like.userId === currentUserId);
-
-              const optimisticLikeEntry = { userId: currentUserId, postId: postId };
+              const isLiked = post.likes.some(
+                (like: { userId: string }) => like.userId === currentUserId,
+              );
+              const optimisticLikeEntry = { userId: currentUserId };
 
               if (isLiked) {
                 return {
                   ...item,
                   data: {
                     ...post,
-                    likes: post.likes.filter((like: any) => like.userId !== currentUserId),
-                    _count: { ...post._count, likes: post._count.likes - 1 },
+                    likes: post.likes.filter(
+                      (like: { userId: string }) =>
+                        like.userId !== currentUserId,
+                    ),
+                    _count: {
+                      ...post._count,
+                      likes: Math.max(0, post._count.likes - 1),
+                    },
                   },
-                };
+                } as ActivityItemPost;
               } else {
                 return {
                   ...item,
@@ -960,9 +972,10 @@ function Feedbox() {
                     likes: [...post.likes, optimisticLikeEntry],
                     _count: { ...post._count, likes: post._count.likes + 1 },
                   },
-                };
+                } as ActivityItemPost;
               }
             }
+
             return item;
           }),
         })),
@@ -972,15 +985,10 @@ function Feedbox() {
     if (likeDebounceTimer.current) {
       clearTimeout(likeDebounceTimer.current);
     }
-
     likeDebounceTimer.current = setTimeout(() => {
-      likeMutation.mutate({
-        postId: postId,
-        currentUserId: currentUserId,
-      });
+      likeMutation.mutate({ postId, currentUserId });
     }, 1000);
   };
-
   const handleFollowToggle = (targetUsername: string) => {
     if (!currentUserId) return;
     followMutation.mutate({ currentUserId, targetUsername });
@@ -1042,13 +1050,10 @@ function Feedbox() {
           ref={isLast ? lastItemRef : null}
           post={item.data}
           currentUserId={currentUserId}
-          // @ts-ignore: unused prop in original file but passed anyway
           loggedInUser={loggedInUserProfile}
-          // @ts-ignore: unused prop in original file but passed anyway
           followingList={loggedInUserProfile?.following}
           onLikeToggle={handleLikeToggle}
           onNavigate={handleNavigateToPost}
-          // @ts-ignore: unused prop in original file but passed anyway
           onFollowToggle={handleFollowToggle}
           onPrefetchProfile={handlePrefetchProfile}
           onPrefetchPost={handlePrefetchPost}
@@ -1093,7 +1098,7 @@ function Feedbox() {
         onClick={handleNavigation}
         className="flex space-x-3 p-4 border-b border-zinc-700 cursor-pointer hover:bg-zinc-900/50 transition-colors duration-200"
       >
-        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
           <Link href={profileUrl}>
             {author.image ? (
               <Image
@@ -1136,14 +1141,14 @@ function Feedbox() {
               </p>
             </div>
             {locationDisplay && (
-              <div className="flex items-center gap-1 text-zinc-500 text-sm flex-shrink-0 ml-2 mt-1">
+              <div className="flex items-center gap-1 text-zinc-500 text-sm shrink-0 ml-2 mt-1">
                 <MapPin size={14} />
                 <span>{locationDisplay}</span>
               </div>
             )}
           </div>
 
-          <p className="text-white mt-1 font-bold whitespace-pre-wrap break-words text-lg">
+          <p className="text-white mt-1 font-bold whitespace-pre-wrap words text-lg">
             {title}
           </p>
 
@@ -1167,7 +1172,7 @@ function Feedbox() {
                   <span className="font-medium">Date:</span>
                   <span>
                     {new Date(
-                      (data as ActivityItemGig["data"]).date,
+                      (data as ActivityItemGig["data"]).createdAt,
                     ).toLocaleDateString()}
                   </span>
                 </div>
@@ -1272,7 +1277,10 @@ function Feedbox() {
       )}
 
       {!isLoading && !hasNextPage && feedItems.length > 0 && (
-        <p className="text-zinc-500 text-center p-4">You've reached the end</p>
+        <p className="text-zinc-500 text-center p-4">
+          this is the end ...
+          <Music />
+        </p>
       )}
 
       {!isLoading && !isFetchingNextPage && feedItems.length === 0 && (
@@ -1287,14 +1295,14 @@ function Feedbox() {
           onClick={closeModal}
         >
           <button
-            className="absolute top-4 right-4 text-white z-[60] p-2"
+            className="absolute top-4 right-4 text-white z-60 p-2"
             onClick={closeModal}
           >
             <X size={32} />
           </button>
           {modalImages.length > 1 && (
             <button
-              className="absolute left-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
+              className="absolute left-4 p-2 bg-black/50 rounded-full text-white z-60 hover:bg-black/80 transition-colors"
               onClick={showPrevImage}
             >
               <ChevronLeft size={32} />
@@ -1313,7 +1321,7 @@ function Feedbox() {
           </div>
           {modalImages.length > 1 && (
             <button
-              className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
+              className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-60 hover:bg-black/80 transition-colors"
               onClick={showNextImage}
             >
               <ChevronRight size={32} />

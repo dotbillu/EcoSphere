@@ -156,7 +156,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
         let savedReaction: any;
         let action: "added" | "removed" = "added";
         let messageId: string;
-        let conversationId: string;
+        let conversationId: string | undefined;
 
         if (existing) {
           await prisma.reaction.delete({ where: { id: existing.id } });

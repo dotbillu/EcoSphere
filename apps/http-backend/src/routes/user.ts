@@ -1,13 +1,13 @@
 import { Router } from "express";
-import { prisma } from "../lib/prisma";
-import { upload } from "../multer";
+import { prisma } from "@lib/prisma";
+import { upload } from "@multer";
 import type { Router as ExpressRouter } from "express";
 
 const router: ExpressRouter = Router();
 
 const profileInclude = {
   posts: {
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "desc" as const },
     include: {
       likes: { select: { userId: true } },
       _count: { select: { likes: true, comments: true } },
@@ -16,7 +16,7 @@ const profileInclude = {
   rooms: {
     include: {
       groupMessages: {
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: "desc" as const },
         take: 1,
         include: {
           sender: { select: { name: true } },
@@ -36,7 +36,7 @@ const profileInclude = {
     },
   },
   gigs: {
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "desc" as const },
     select: {
       id: true,
       title: true,

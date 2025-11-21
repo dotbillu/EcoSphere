@@ -5,11 +5,7 @@ import type { Router as ExpressRouter } from "express";
 const router: ExpressRouter = Router();
 
 router.get("/", async (req, res) => {
-  const {
-    q: query,
-    userId: currentUserId,
-    followersOnly,
-  } = req.query;
+  const { q: query, userId: currentUserId, followersOnly } = req.query;
 
   if (!query || typeof query !== "string" || query.trim().length === 0) {
     return res.status(400).json({ message: "Search query 'q' is required" });
@@ -155,12 +151,7 @@ router.get("/", async (req, res) => {
 });
 
 router.get("/page", async (req, res) => {
-  const {
-    q: query,
-    tab = "all",
-    skip = "0",
-    take = "10",
-  } = req.query;
+  const { q: query, tab = "all", skip = "0", take = "10" } = req.query;
 
   if (!query || typeof query !== "string" || query.trim().length === 0) {
     return res.status(400).json({ message: "Search query 'q' is required" });

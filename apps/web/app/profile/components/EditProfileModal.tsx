@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { UserProfile } from "@/store";
 import { X, Camera } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { API_BASE_URL } from "@lib/constants";
+import { UserProfile } from "@/lib/types";
 
 const getImageUrl = (path: string | null | undefined) => {
   if (!path) return "";

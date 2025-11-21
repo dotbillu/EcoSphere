@@ -8,12 +8,13 @@ import {
   User,
   Search,
 } from "lucide-react";
-import { CurrentPageAtom, PageName, userAtom, UserProfile } from "../store";
+import { CurrentPageAtom, PageName, userAtom } from "../store";
 import { useAtom } from "jotai";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { API_BASE_URL } from "@/lib/constants";
+import { UserProfile } from "@/lib/types";
 
 const fetchProfile = async (username: string): Promise<UserProfile> => {
   const res = await fetch(`${API_BASE_URL}/user/profile/${username}`);

@@ -11,7 +11,7 @@ import {
   Heart,
   MessageCircle,
 } from "lucide-react";
-import { Post } from "../../store";
+import { Post } from "@types"; 
 import { getImageUrl } from "../../lib/utils";
 
 export default function ProfilePost({

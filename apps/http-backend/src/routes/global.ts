@@ -95,7 +95,6 @@ router.get("/feed", async (req, res) => {
 
     allItems.sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
 
-    // Apply pagination to the *final* sorted list
     const paginatedItems = allItems.slice(skipNum, skipNum + takeNum);
     const hasNextPage = allItems.length > skipNum + takeNum;
 

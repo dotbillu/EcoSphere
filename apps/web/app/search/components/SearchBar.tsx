@@ -4,9 +4,9 @@ import { Search, Loader2, X } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAtom } from "jotai";
-import useDebounce from "../hooks/useDebounce";
+import useDebounce from "@hooks/useDebounce";
 import SearchResults from "./SearchResults";
-import { userAtom } from "../store";
+import { userAtom } from "@store";
 import { API_BASE_URL } from "@/lib/constants";
 import { useRouter } from "next/navigation"; // Import useRouter
 import { SearchResult } from "@/lib/types"; // Import from main types file

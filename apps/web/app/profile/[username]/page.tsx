@@ -1,7 +1,7 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { userAtom, User, UserProfile } from "../../store";
+import { userAtom } from "@store";
 import { useState, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -17,6 +17,7 @@ import ProfileRoom from "@profilecomponents/ProfileRoom";
 
 import { getImageUrl } from "@lib/utils";
 import { API_BASE_URL } from "@/lib/constants";
+import { User, UserProfile } from "@/lib/types";
 
 const fetchProfile = async (username: string): Promise<UserProfile> => {
   const res = await fetch(`${API_BASE_URL}/user/profile/${username}`);
@@ -30,7 +31,7 @@ const toggleFollow = async ({
   currentUserId,
   targetUsername,
 }: {
-  currentUserId: string; 
+  currentUserId: string;
   targetUsername: string;
 }) => {
   const res = await fetch(`${API_BASE_URL}/user/follow`, {
@@ -48,8 +49,8 @@ const toggleLike = async ({
   userId,
   postId,
 }: {
-  userId: string; 
-  postId: string; 
+  userId: string;
+  postId: string;
 }) => {
   const res = await fetch(`${API_BASE_URL}/feed/posts/${postId}/like`, {
     method: "POST",
@@ -102,7 +103,9 @@ export default function Profile() {
           data.profile,
         );
       } else {
-        queryClient.invalidateQueries({ queryKey: ["profile", usernameFromUrl] });
+        queryClient.invalidateQueries({
+          queryKey: ["profile", usernameFromUrl],
+        });
       }
     },
   });
@@ -116,26 +119,24 @@ export default function Profile() {
           data.profile,
         );
       } else {
-        queryClient.invalidateQueries({ queryKey: ["profile", usernameFromUrl] });
+        queryClient.invalidateQueries({
+          queryKey: ["profile", usernameFromUrl],
+        });
       }
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
   });
 
   const handleProfileUpdate = (updatedProfileData: UserProfile) => {
-    queryClient.setQueryData(
-      ["profile", usernameFromUrl],
-      updatedProfileData,
-    );
-    const { posts, gigs, rooms, mapRooms, followers, following, ...updatedUser } =
-      updatedProfileData;
+    queryClient.setQueryData(["profile", usernameFromUrl], updatedProfileData);
+    const { ...updatedUser } = updatedProfileData;
     setLoggedInUser(updatedUser as User);
     setIsEditModalOpen(false);
   };
 
   const handleLikeToggle = (postId: string) => {
     if (!loggedInUser?.id || !profile) return;
-    const currentUserId = loggedInUser.id; 
+    const currentUserId = loggedInUser.id;
     const queryKey = ["profile", usernameFromUrl];
 
     queryClient.setQueryData<UserProfile>(queryKey, (previousProfile) => {
@@ -144,9 +145,9 @@ export default function Profile() {
       return {
         ...previousProfile,
         posts: previousProfile.posts.map((post) => {
-          if (post.id === postId) { 
+          if (post.id === postId) {
             const isLiked = post.likes.some(
-              (like) => like.userId === currentUserId, 
+              (like) => like.userId === currentUserId,
             );
 
             const optimisticLikeEntry = { userId: currentUserId };
@@ -155,7 +156,7 @@ export default function Profile() {
               return {
                 ...post,
                 likes: post.likes.filter(
-                  (like) => like.userId !== currentUserId, 
+                  (like) => like.userId !== currentUserId,
                 ),
                 _count: { ...post._count, likes: post._count.likes - 1 },
               };
@@ -178,8 +179,8 @@ export default function Profile() {
 
     likeDebounceTimer.current = setTimeout(() => {
       likeMutation.mutate({
-        userId: currentUserId, // string
-        postId: postId, // string
+        userId: currentUserId,
+        postId: postId,
       });
     }, 1000);
   };
@@ -197,20 +198,20 @@ export default function Profile() {
       if (!oldProfile) return;
 
       const optimisticFollower = {
-        id: loggedInUser.id, // string
+        id: loggedInUser.id,
         username: loggedInUser.username,
         name: loggedInUser.name,
-        image: loggedInUser.image,
+        image: loggedInUser.image ?? null,
       };
 
       const alreadyFollowing = oldProfile.followers.some(
-        (f) => f.id === loggedInUser.id, // Compare string IDs
+        (f) => f.id === loggedInUser.id,
       );
       let newFollowers;
 
       if (alreadyFollowing) {
         newFollowers = oldProfile.followers.filter(
-          (f) => f.id !== loggedInUser.id, // Compare string IDs
+          (f) => f.id !== loggedInUser.id,
         );
       } else {
         newFollowers = [...oldProfile.followers, optimisticFollower];
@@ -224,7 +225,7 @@ export default function Profile() {
 
     followDebounceTimer.current = setTimeout(() => {
       followMutation.mutate({
-        currentUserId: loggedInUser.id, // string
+        currentUserId: loggedInUser.id,
         targetUsername: profile.username,
       });
     }, 1000);

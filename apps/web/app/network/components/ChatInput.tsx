@@ -5,13 +5,11 @@ import { SendHorizontal, Smile } from "lucide-react";
 import EmojiPicker, { EmojiClickData, Theme } from "emoji-picker-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAtom } from "jotai";
-import { socketAtom } from "../layout"; 
-import { selectedConversationAtom, userAtom } from "@/store"; 
-import { ChatInputProps } from "./networktypes";
+import { socketAtom } from "../layout";
+import { selectedConversationAtom, userAtom } from "@/store";
+import { ChatInputProps } from "@/lib/types";
 
 const INITIAL_WIDTH = 1000;
-const MAX_WIDTH_PERCENTAGE = 1;
-const PADDING_AND_BUTTONS = 100;
 
 const TEXTAREA_CLASS = `
   bg-transparent border-none resize-none 
@@ -26,16 +24,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const [content, setContent] = useState("");
   const [isEmojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const [dynamicWidth, setDynamicWidth] = useState(INITIAL_WIDTH);
+  
+  // Kept purely for the animation prop, currently static at 1000
+  const [dynamicWidth] = useState(INITIAL_WIDTH);
 
   const [socket] = useAtom(socketAtom);
   const [currentUser] = useAtom(userAtom);
   const [selectedConversation] = useAtom(selectedConversationAtom);
+  
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const widthMeasureRef = useRef<HTMLDivElement>(null);
   const sendButtonRef = useRef<HTMLButtonElement>(null);
 
   const isEnabled = content.trim() !== "";
@@ -88,35 +87,19 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   const onEmojiClick = (emojiData: EmojiClickData) => {
     setContent((prev) => prev + emojiData.emoji);
-    textareaRef.current?.focus();
+    // Small delay ensures focus returns after state update
+    setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
+  // Auto-height for textarea
   useEffect(() => {
-    if (textareaRef.current && formRef.current && widthMeasureRef.current) {
+    if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-
-      const parentWidth = formRef.current.clientWidth - 32;
-      const maxWidth = parentWidth * MAX_WIDTH_PERCENTAGE;
-
-      const textWidth = widthMeasureRef.current.scrollWidth;
-
-      const buttonSpace = isEnabled
-        ? PADDING_AND_BUTTONS
-        : PADDING_AND_BUTTONS - 40;
-      const newDynamicWidth = textWidth + buttonSpace;
-
-      let targetWidth = Math.max(INITIAL_WIDTH, newDynamicWidth);
-      targetWidth = Math.min(targetWidth, maxWidth);
-
-      setDynamicWidth(targetWidth);
     }
+  }, [content]);
 
-    if (content === "") {
-      setDynamicWidth(INITIAL_WIDTH);
-    }
-  }, [content, isEnabled]);
-
+  // Close emoji picker on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (formRef.current && !formRef.current.contains(event.target as Node)) {
@@ -124,21 +107,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [formRef]);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="p-4 relative">
-      <div
-        ref={widthMeasureRef}
-        className={`${TEXTAREA_CLASS} absolute left-[-9999px] z-[-1] visibility-hidden whitespace-pre w-auto`}
-      >
-        {content || "Type a message..."}
-      </div>
       {isEmojiPickerOpen && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2">
+        <div className="absolute bottom-full left-1/4 m-10 -translate-x-1/2 mb-2">
           <EmojiPicker
             onEmojiClick={onEmojiClick}
             theme={Theme.DARK}
@@ -154,11 +129,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
           layout
           animate={{ width: dynamicWidth }}
           transition={{ type: "spring", stiffness: 500, damping: 100 }}
-          className="flex items-end gap-2 bg-zinc-900 rounded-4xl p-2"
+          className="flex items-end gap-2 bg-zinc-900 rounded-4xl p-1"
         >
           <button
             type="button"
-            className="shrink-0 w-10 h-10 mb-1 rounded-full text-gray-400 hover:text-gray-200 flex items-center justify-center transition-colors"
+            className="shrink-0 w-10 h-10 mb-0.5 rounded-full text-gray-400 hover:text-gray-200 flex items-center justify-center transition-colors"
             onClick={() => setEmojiPickerOpen((prev) => !prev)}
           >
             <Smile size={20} />
@@ -188,10 +163,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 exit={{ opacity: 0, scale: 0.7, width: 0 }}
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 type="submit"
-                className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center 
-                                 transition-colors duration-200 ease-out
-                                 bg-indigo-600 hover:bg-indigo-700 text-white
-                                 mb-1`}
+                className="shrink-0 w-10 h-10 mr-0.5 rounded-full flex items-center justify-center transition-colors duration-200 ease-out bg-indigo-600 hover:bg-indigo-700 text-white mb-0.5"
               >
                 <SendHorizontal size={18} />
               </motion.button>

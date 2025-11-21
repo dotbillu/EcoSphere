@@ -4,8 +4,9 @@ import { signIn, useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAtom } from "jotai";
-import { userAtom, User } from "@/store";
+import { userAtom } from "@/store";
 import { API_BASE_URL } from "@/lib/constants";
+import { User } from "@/lib/types";
 
 export default function LoginPage() {
   const { data: session } = useSession();
@@ -15,22 +16,23 @@ export default function LoginPage() {
   useEffect(() => {
     if (!session?.user) return;
 
+    const currentUser = session.user;
+
     const syncUser = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/user`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: session.user.name,
-            email: session.user.email,
-            image: session.user.image,
+            name: currentUser.name,
+            email: currentUser.email,
+            image: currentUser.image,
           }),
         });
 
-        // The user object returned from the backend now has a string (UUID) ID.
-        const user: User = await res.json();
-        setUser(user);
-        console.log(user);
+        const userData: User = await res.json();
+        setUser(userData);
+        console.log(userData);
         router.push("/house");
       } catch (err) {
         console.error("Failed to sync user:", err);
