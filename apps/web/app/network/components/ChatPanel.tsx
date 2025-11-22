@@ -3,7 +3,7 @@
 import Image from "next/image";
 import React, { useEffect, useRef, useState, useLayoutEffect } from "react";
 import Link from "next/link";
-import { useAtom} from "jotai";
+import { useAtom } from "jotai";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, Check, SmilePlus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,7 +17,8 @@ import {
   MessageBubbleProps,
   MessageListProps,
   ChatPanelProps,
-} from "@types";
+  User,
+} from "@/lib/types"; // Changed from "@types" to "@/lib/types" based on your store.ts
 import { API_BASE_URL } from "@/lib/constants";
 import { db } from "@/lib/db";
 import { useChatMessages } from "@/hooks/useChatMessages";
@@ -25,15 +26,17 @@ import ChatPanelSkeleton from "../ui/ChatPanelSkeleton";
 import SidebarSkeleton from "../ui/SidebarSkeleton";
 import EmojiPicker from "../ui/EmojiPicker";
 import DateHeader from "../ui/DateHeader";
-import { socketAtom } from "../layout";
 import {
   selectedConversationAtom,
   networkErrorAtom,
   userAtom,
   messagesAtom,
 } from "@/store";
+import { socketAtom } from "../layout";
 
 const SCROLL_THRESHOLD = 200;
+
+// --- Helper Functions ---
 
 function formatLastSeen(lastSeen: string | null | undefined): string {
   if (!lastSeen) return "";
@@ -69,7 +72,15 @@ const formatDate = (date: Date) => {
   });
 };
 
-// --- Message Components ---
+const toSimpleUser = (user: User): SimpleUser => ({
+  id: user.id,
+  username: user.username,
+  name: user.name,
+  image: user.image || null,
+  isOnline: true,
+  lastMessage: null,
+  lastMessageTimestamp: null,
+});
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
@@ -86,18 +97,24 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     minute: "2-digit",
   });
   const placeholder = `https://placehold.co/40x40/374151/white?text=${senderName.charAt(0).toUpperCase()}`;
-  const src = message.sender?.image
-    ? `${API_BASE_URL}/uploads/${message.sender.image}`
+
+  const rawImage = message.sender?.image;
+  const src = rawImage
+    ? rawImage.startsWith("http")
+      ? rawImage
+      : `${API_BASE_URL}/uploads/${rawImage}`
     : placeholder;
 
-  const groupedReactions = message.reactions ? message.reactions.reduce(
-    (acc, reaction) => {
-      acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>,
-  ) : {};
-  
+  const groupedReactions = message.reactions
+    ? message.reactions.reduce(
+        (acc, reaction) => {
+          acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      )
+    : {};
+
   const hasReactions = Object.entries(groupedReactions).length > 0;
   const bubbleEnterDelay = 0.45;
   const reactionEnterDelay = bubbleEnterDelay + 0.1;
@@ -112,10 +129,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       >
         {!isMe && (
           <Link
-            href={`/profile/${message.sender?.username || '#'}`}
+            href={`/profile/${message.sender?.username || "#"}`}
             className="self-end"
           >
-            <Image
+            <img
               src={src}
               onError={(e) => (e.currentTarget.src = placeholder)}
               alt={senderName}
@@ -141,7 +158,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         >
           {isGroup && !isMe && (
             <Link
-              href={`/profile/${message.sender?.username || '#'}`}
+              href={`/profile/${message.sender?.username || "#"}`}
               className="text-xs font-bold text-indigo-400 mb-1 hover:underline"
             >
               {senderName}
@@ -216,14 +233,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 };
 
-const MessageList: React.FC<MessageListProps> = React.memo(
+const MessageList = React.memo(
   ({
     messages,
     currentUser,
     selectedConversation,
     onDelete,
     onToggleReaction,
-  }) => {
+  }: MessageListProps) => {
     let lastDateString: string | null = null;
     let lastMessageTimestamp: Date | null = null;
     let lastSenderId: string | null = null;
@@ -273,19 +290,16 @@ const MessageList: React.FC<MessageListProps> = React.memo(
 );
 MessageList.displayName = "MessageList";
 
-// --- Main Component ---
-
-const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
+const ChatPanel: React.FC<ChatPanelProps> = () => {
   const [currentUser] = useAtom(userAtom);
   const [selectedConversation] = useAtom(selectedConversationAtom);
   const [messages, setMessages] = useAtom(messagesAtom);
   const [error, setError] = useAtom(networkErrorAtom);
   const [socket] = useAtom(socketAtom);
-  
-  // Changed from single user to Array to handle group typing
+
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const [isSwitching, setIsSwitching] = useState(false);
-  const [isExiting, setIsExiting] = useState(false);
+  const [isExiting] = useState(false);
   const [headerImgError, setHeaderImgError] = useState(false);
 
   const router = useRouter();
@@ -302,7 +316,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
     currentUserRef.current = currentUser;
   }, [selectedConversation, currentUser]);
 
-  // 1. LOAD FROM DB
   useEffect(() => {
     if (!selectedConversation || !currentUser) return;
 
@@ -325,19 +338,26 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
             if (msg.roomId) return false;
             const sId = String(msg.senderId);
             const rId = String(msg.recipientId);
-            return (sId === myId && rId === otherId) || (sId === otherId && rId === myId);
+            return (
+              (sId === myId && rId === otherId) ||
+              (sId === otherId && rId === myId)
+            );
           })
           .toArray();
       }
 
-      cachedMsgs.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      
+      cachedMsgs.sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+
       if (cachedMsgs.length > 0) {
         setMessages(cachedMsgs);
         setTimeout(() => {
-           if (scrollContainerRef.current) {
-             scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
-           }
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop =
+              scrollContainerRef.current.scrollHeight;
+          }
         }, 0);
       }
 
@@ -348,7 +368,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
     };
 
     loadFromCache();
-  }, [selectedConversation?.data.id, currentUser?.id, setMessages]);
+  }, [
+    selectedConversation?.data.id,
+    currentUser?.id,
+    setMessages,
+    currentUser,
+    selectedConversation,
+  ]);
 
   // 2. FETCH FROM NETWORK
   const {
@@ -362,9 +388,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
 
   useEffect(() => {
     if (fetchedMessages && fetchedMessages.length > 0) {
-        const sorted = [...fetchedMessages].reverse(); 
-        setMessages(sorted);
-        db.messages.bulkPut(sorted).catch(err => console.error("DB Bulk Sync Error", err));
+      const sorted = [...fetchedMessages].reverse();
+      setMessages(sorted);
+      db.messages
+        .bulkPut(sorted)
+        .catch((err) => console.error("DB Bulk Sync Error", err));
     }
   }, [fetchedMessages, setMessages]);
 
@@ -381,27 +409,30 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
   // Scroll Logic
   useLayoutEffect(() => {
     if (isSwitching || !scrollContainerRef.current) return;
-    
+
     if (oldScrollHeightRef.current > 0 && !isLoadingMore) {
       const newScrollHeight = scrollContainerRef.current.scrollHeight;
-      scrollContainerRef.current.scrollTop = newScrollHeight - oldScrollHeightRef.current;
+      scrollContainerRef.current.scrollTop =
+        newScrollHeight - oldScrollHeightRef.current;
       oldScrollHeightRef.current = 0;
       return;
     }
 
     if (messages.length > 0) {
       if (isInitialLoad.current) {
-        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        scrollContainerRef.current.scrollTop =
+          scrollContainerRef.current.scrollHeight;
         isInitialLoad.current = false;
       } else {
-        const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+        const { scrollTop, scrollHeight, clientHeight } =
+          scrollContainerRef.current;
         const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
         if (isNearBottom) {
           messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         }
       }
     }
-  }, [messages, isLoadingMore, isSwitching, typingUsers]); // Added typingUsers to scroll deps
+  }, [messages, isLoadingMore, isSwitching, typingUsers]);
 
   // 3. SOCKET LOGIC
   useEffect(() => {
@@ -409,86 +440,74 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
 
     const handleUserTyping = (data: TypingUser) => {
       const currentConvo = selectedConversationRef.current;
-      // Ensure we are in the right conversation
-      if (currentConvo && String(data.conversationId) === String(currentConvo.data.id)) {
+      if (
+        currentConvo &&
+        String(data.conversationId) === String(currentConvo.data.id)
+      ) {
         setTypingUsers((prev) => {
-            // Avoid duplicates
-            if (prev.some(u => u.name === data.name)) return prev;
-            return [...prev, data];
+          if (prev.some((u) => u.name === data.name)) return prev;
+          return [...prev, data];
         });
       }
     };
 
-    const handleUserStoppedTyping = (data: { conversationId: string; name?: string }) => {
+    const handleUserStoppedTyping = (data: {
+      conversationId: string;
+      name?: string;
+    }) => {
       const currentConvo = selectedConversationRef.current;
-      if (currentConvo && String(data.conversationId) === String(currentConvo.data.id)) {
+      if (
+        currentConvo &&
+        String(data.conversationId) === String(currentConvo.data.id)
+      ) {
         setTypingUsers((prev) => {
-             // If name is provided (it should be), filter by name
-             // If not, we might clear all, but usually 'name' or 'userId' is sent back
-             // Based on your previous code, we rely on name or ID.
-             // Here assuming data has 'name' or we filter blindly if needed (unsafe for groups).
-             // Let's assume `name` is passed back in `stopped-typing` for groups.
-             // If your backend only sends convoId, we have to clear all, but let's try filtering by name/id logic if avail.
-             // Fallback: if previous TypingUser has ID, match ID.
-             
-             // For now, assuming simple logic:
-             return prev.filter(u => u.conversationId !== data.conversationId); 
-             // Wait, that clears EVERYONE. 
-             // Better logic: The socket event usually sends WHO stopped.
-             // If your backend only sends { conversationId }, then yes, it clears everyone.
-             // If it sends { conversationId, name/userId }, we filter specific user.
-             // Assuming typical behavior:
-             // return prev.filter(u => u.name !== data.name);
-        });
-        
-        // Note: Since I can't see your backend socket emission for stop-typing, 
-        // if it only sends conversationId, we have to clear the list or it gets buggy.
-        // I will stick to clearing for safety unless we know the specific user stopped.
-        // HOWEVER, for group chats, usually specific user is sent. 
-        // I'll implement a safe "Filter by name if exists, else clear" strategy.
-        setTypingUsers((prev) => {
-             // @ts-ignore - 'name' might exist on data even if typed strictly
-             if (data.name) return prev.filter(u => u.name !== data.name);
-             return []; 
+          if (data.name) return prev.filter((u) => u.name !== data.name);
+          return [];
         });
       }
     };
 
     const handleIncomingMessage = (msg: MessageType) => {
-         const currentConvo = selectedConversationRef.current;
-         const currentUser = currentUserRef.current;
-         
-         if (!currentConvo || !currentUser) return;
+      const currentConvo = selectedConversationRef.current;
+      const currentUser = currentUserRef.current;
 
-         // When a message comes in, remove that sender from typing list immediately
-         setTypingUsers(prev => prev.filter(u => u.name !== msg.sender?.name));
+      if (!currentConvo || !currentUser) return;
 
-         let isForCurrentConvo = false;
+      setTypingUsers((prev) => prev.filter((u) => u.name !== msg.sender?.name));
 
-         if (currentConvo.type === "room") {
-            if(String(msg.roomId) === String(currentConvo.data.id)) isForCurrentConvo = true;
-         } else if (currentConvo.type === "dm") {
-            const msgSender = String(msg.senderId);
-            const msgRecipient = String(msg.recipientId);
-            const currentId = String(currentUser.id);
-            const convoId = String(currentConvo.data.id);
+      let isForCurrentConvo = false;
 
-            if ((msgSender === convoId && msgRecipient === currentId) ||
-                (msgSender === currentId && msgRecipient === convoId)) {
-                 isForCurrentConvo = true;
-            }
-         }
+      if (currentConvo.type === "room") {
+        if (String(msg.roomId) === String(currentConvo.data.id))
+          isForCurrentConvo = true;
+      } else if (currentConvo.type === "dm") {
+        const msgSender = String(msg.senderId);
+        const msgRecipient = String(msg.recipientId);
+        const currentId = String(currentUser.id);
+        const convoId = String(currentConvo.data.id);
 
-         if (isForCurrentConvo) {
-             setMessages(prev => [...prev, msg]);
-             db.messages.put(msg).catch(e => console.error("Socket DB Write Error", e));
-             setTimeout(() => {
-               messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-             }, 50);
-         } else {
-             db.messages.put(msg).catch(e => console.error("Background DB Write Error", e));
-         }
-    }
+        if (
+          (msgSender === convoId && msgRecipient === currentId) ||
+          (msgSender === currentId && msgRecipient === convoId)
+        ) {
+          isForCurrentConvo = true;
+        }
+      }
+
+      if (isForCurrentConvo) {
+        setMessages((prev) => [...prev, msg]);
+        db.messages
+          .put(msg)
+          .catch((e) => console.error("Socket DB Write Error", e));
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 50);
+      } else {
+        db.messages
+          .put(msg)
+          .catch((e) => console.error("Background DB Write Error", e));
+      }
+    };
 
     socket.on("user:typing", handleUserTyping);
     socket.on("user:stopped-typing", handleUserStoppedTyping);
@@ -503,37 +522,33 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
     };
   }, [socket, setMessages]);
 
-  // --- Helper to render typing text for groups ---
   const renderTypingIndicator = () => {
     if (typingUsers.length === 0) return null;
+    const isDM = selectedConversation?.type === "dm";
 
-    const isDM = selectedConversation?.type === 'dm';
-    
-    // DM: Just show dots
     if (isDM) {
-       return (
-         <div className="ml-4 mb-2 mt-2">
-            <span className="loading loading-dots loading-sm text-zinc-400"></span>
-         </div>
-       );
+      return (
+        <div className="ml-4 mb-2 mt-2">
+          <span className="loading loading-dots loading-sm text-zinc-400"></span>
+        </div>
+      );
     }
 
-    // GROUP: Show dots + names
-    const names = typingUsers.map(u => u.name);
+    const names = typingUsers.map((u) => u.name);
     let text = "";
     if (names.length <= 3) {
-        text = names.join(", ");
+      text = names.join(", ");
     } else {
-        text = `${names.slice(0, 3).join(", ")}...`;
+      text = `${names.slice(0, 3).join(", ")}...`;
     }
 
     return (
-        <div className="ml-4 mb-2 mt-2 flex items-center gap-2 animate-pulse">
-             <span className="loading loading-dots loading-xs text-zinc-400"></span>
-             <span className="text-xs text-zinc-500 font-medium">
-                {text} is typing...
-             </span>
-        </div>
+      <div className="ml-4 mb-2 mt-2 flex items-center gap-2 animate-pulse">
+        <span className="loading loading-dots loading-xs text-zinc-400"></span>
+        <span className="text-xs text-zinc-500 font-medium">
+          {text} is typing...
+        </span>
+      </div>
     );
   };
 
@@ -559,18 +574,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
   };
 
   const handleSendMessage = async (content: string) => {
-    if (!selectedConversation || content.trim() === "" || !currentUser || !socket) return;
-    
+    if (
+      !selectedConversation ||
+      content.trim() === "" ||
+      !currentUser ||
+      !socket
+    )
+      return;
+
     const tempId = crypto.randomUUID();
-    const tempSender: SimpleUser = {
-      id: currentUser.id,
-      username: currentUser.username,
-      name: currentUser.name || "Me",
-      image: currentUser.image || null,
-      lastMessage: null,
-      lastMessageTimestamp: null,
-    };
-    
+    // FIXED: Use helper to ensure SimpleUser type
+    const tempSender = toSimpleUser(currentUser);
+
     const tempMessageBase = {
       id: tempId,
       content,
@@ -587,18 +602,36 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
 
     if (selectedConversation.type === "room") {
       eventName = "group:send";
-      payload = { senderId: currentUser.id, roomId: selectedConversation.data.id, content, tempId };
-      tempMessage = { ...tempMessageBase, roomId: selectedConversation.data.id } as GroupMessage;
+      payload = {
+        senderId: currentUser.id,
+        roomId: selectedConversation.data.id,
+        content,
+        tempId,
+      };
+      tempMessage = {
+        ...tempMessageBase,
+        roomId: selectedConversation.data.id,
+      } as GroupMessage;
     } else {
       eventName = "dm:send";
-      payload = { senderId: currentUser.id, recipientId: selectedConversation.data.id, content, tempId };
-      tempMessage = { ...tempMessageBase, recipientId: selectedConversation.data.id } as DirectMessage;
+      payload = {
+        senderId: currentUser.id,
+        recipientId: selectedConversation.data.id,
+        content,
+        tempId,
+      };
+      tempMessage = {
+        ...tempMessageBase,
+        recipientId: selectedConversation.data.id,
+      } as DirectMessage;
     }
-    
-    setMessages(prev => [...prev, tempMessage]);
-    db.messages.put(tempMessage).catch(e => console.error("Send DB Write Error", e));
+
+    setMessages((prev) => [...prev, tempMessage]);
+    db.messages
+      .put(tempMessage)
+      .catch((e) => console.error("Send DB Write Error", e));
     socket.emit(eventName, payload);
-    
+
     setTimeout(() => {
       scrollContainerRef.current?.scrollTo({
         top: scrollContainerRef.current.scrollHeight,
@@ -615,73 +648,147 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
     await db.messages.delete(messageId);
 
     try {
-      socket.emit("message:delete", { userId: currentUser.id, messageId: messageId as string, messageType });
+      socket.emit("message:delete", {
+        userId: currentUser.id,
+        messageId: messageId as string,
+        messageType,
+      });
     } catch (err) {
-      setError("Failed to delete message.");
+      setError("Failed to delete message." + err);
       setMessages(oldMessages);
     }
   };
 
-  const handleToggleReaction = async (messageId: number | string, emoji: string) => {
+  const handleToggleReaction = async (
+    messageId: number | string,
+    emoji: string,
+  ) => {
     if (!currentUser || !selectedConversation || !socket) return;
     const messageType = selectedConversation.type === "room" ? "group" : "dm";
-    
+
     const calculateReactions = (msg: MessageType) => {
-       const existingReaction = msg.reactions?.find((r) => r.emoji === emoji && r.user.id === currentUser.id);
-       const reactions = msg.reactions || [];
-       return existingReaction
-           ? reactions.filter((r) => r.id !== existingReaction.id)
-           : [...reactions, { id: crypto.randomUUID(), emoji, user: { id: currentUser.id, username: currentUser.username, name: currentUser.name, image: currentUser.image || null, lastMessage: null, lastMessageTimestamp: null } }];
+      const existingReaction = msg.reactions?.find(
+        (r) => r.emoji === emoji && r.user.id === currentUser.id,
+      );
+      const reactions = msg.reactions || [];
+      return existingReaction
+        ? reactions.filter((r) => r.id !== existingReaction.id)
+        : [
+            ...reactions,
+            {
+              id: crypto.randomUUID(),
+              emoji,
+              user: toSimpleUser(currentUser),
+            },
+          ];
     };
 
-    setMessages(prev => prev.map(msg => {
-        if(msg.id === messageId) { return { ...msg, reactions: calculateReactions(msg) }; }
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id === messageId) {
+          return { ...msg, reactions: calculateReactions(msg) };
+        }
         return msg;
-    }));
+      }),
+    );
 
     const msg = await db.messages.get(messageId);
-    if(msg) {
-        const newReactions = calculateReactions(msg);
-        await db.messages.update(messageId, { reactions: newReactions });
+    if (msg) {
+      const newReactions = calculateReactions(msg);
+      await db.messages.update(messageId, { reactions: newReactions });
     }
 
-    socket.emit("reaction:toggle", { userId: currentUser.id, emoji, groupMessageId: messageType === "group" ? messageId : undefined, directMessageId: messageType === "dm" ? messageId : undefined });
+    socket.emit("reaction:toggle", {
+      userId: currentUser.id,
+      emoji,
+      groupMessageId: messageType === "group" ? messageId : undefined,
+      directMessageId: messageType === "dm" ? messageId : undefined,
+    });
   };
 
-  if (isExiting) return <div className="fixed inset-0 bg-black z-999 p-4"><SidebarSkeleton /></div>;
+  if (isExiting)
+    return (
+      <div className="fixed inset-0 bg-black z-999 p-4">
+        <SidebarSkeleton />
+      </div>
+    );
   if (!selectedConversation) return null;
   if (isSwitching) return <div className="flex-1 w-full h-full bg-black" />;
 
   const name = selectedConversation.data.name;
-  const rawImageUrl = selectedConversation.type === "room" ? selectedConversation.data.imageUrl : (selectedConversation.data as SimpleUser).image;
+  const rawImageUrl =
+    selectedConversation.type === "room"
+      ? selectedConversation.data.imageUrl
+      : (selectedConversation.data as SimpleUser).image;
   const placeholder = `https://placehold.co/40x40/4f46e5/white?text=${name.charAt(0).toUpperCase()}`;
-  const src = !headerImgError && rawImageUrl ? (rawImageUrl.startsWith("http") ? rawImageUrl : `${API_BASE_URL}/uploads/${rawImageUrl}`) : placeholder;
+  const src =
+    !headerImgError && rawImageUrl
+      ? rawImageUrl.startsWith("http")
+        ? rawImageUrl
+        : `${API_BASE_URL}/uploads/${rawImageUrl}`
+      : placeholder;
   const isDM = selectedConversation.type === "dm";
   const convoData = selectedConversation.data as SimpleUser;
-  const statusText = convoData.isOnline ? "online" : formatLastSeen(convoData.lastSeen);
+  const statusText = convoData.isOnline
+    ? "online"
+    : formatLastSeen(convoData.lastSeen);
 
   return (
     <div className="flex flex-col h-full w-full bg-black relative overflow-hidden ml-2">
+      {/* Header */}
       <div className="flex-none flex items-center p-3 bg-black border-b border-zinc-800 z-10">
-        <button onClick={handleBack} className="md:hidden mr-3 text-zinc-400 hover:text-white">
+        <button
+          onClick={handleBack}
+          className="md:hidden mr-3 text-zinc-400 hover:text-white"
+        >
           <ArrowLeft size={24} />
         </button>
-        <Link href={isDM ? `/profile/${(selectedConversation.data as SimpleUser).username}` : "#"}>
-          <Image src={src} alt={name} width={40} height={40} onError={() => setHeaderImgError(true)} className="w-10 h-10 rounded-full object-cover mr-3" unoptimized />
+        <Link
+          href={
+            isDM
+              ? `/profile/${(selectedConversation.data as SimpleUser).username}`
+              : "#"
+          }
+        >
+          <Image
+            src={src}
+            alt={name}
+            width={40}
+            height={40}
+            onError={() => setHeaderImgError(true)}
+            className="w-10 h-10 rounded-full object-cover mr-3"
+            unoptimized
+          />
         </Link>
         <div className="grow min-w-0">
-          <Link href={isDM ? `/profile/${(selectedConversation.data as SimpleUser).username}` : "#"} className="font-bold text-white hover:underline truncate block">
+          <Link
+            href={
+              isDM
+                ? `/profile/${(selectedConversation.data as SimpleUser).username}`
+                : "#"
+            }
+            className="font-bold text-white hover:underline truncate block"
+          >
             {name}
           </Link>
           {isDM ? (
-            <span className={`text-xs block truncate ${convoData.isOnline ? "text-white" : "text-zinc-500"}`}>{statusText}</span>
+            <span
+              className={`text-xs block truncate ${convoData.isOnline ? "text-white" : "text-zinc-500"}`}
+            >
+              {statusText}
+            </span>
           ) : (
             <span className="text-xs text-zinc-500 block">Group</span>
           )}
         </div>
       </div>
 
-      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 min-h-0 overflow-y-auto bg-black custom-scrollbar">
+      {/* Messages Area */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto bg-black custom-scrollbar"
+      >
         {isLoadingMore && (
           <div className="flex justify-center my-2">
             <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
@@ -697,7 +804,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
               </div>
             )}
             {currentUser && selectedConversation && (
-              <MessageList messages={messages} currentUser={currentUser} selectedConversation={selectedConversation} onDelete={handleDeleteMessage} onToggleReaction={handleToggleReaction} />
+              <MessageList
+                messages={messages}
+                currentUser={toSimpleUser(currentUser)}
+                selectedConversation={selectedConversation}
+                onDelete={handleDeleteMessage}
+                onToggleReaction={handleToggleReaction}
+              />
             )}
             {renderTypingIndicator()}
           </>
@@ -706,9 +819,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isMobile, onBack }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      
+      {/* Input Area */}
       <div className="flex-none w-full bg-black z-10">
-        <ChatInput onSend={handleSendMessage} onGetSendButtonPosition={() => { }} />
+        <ChatInput
+          onSend={handleSendMessage}
+          onGetSendButtonPosition={() => {}}
+        />
       </div>
     </div>
   );

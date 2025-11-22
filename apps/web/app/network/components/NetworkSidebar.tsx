@@ -1,13 +1,12 @@
 "use client";
-
+import { QueryFunctionContext } from "@tanstack/react-query";
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAtom, useSetAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
 import { Search, Pencil, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   ConversationItemProps,
@@ -16,7 +15,7 @@ import {
   SimpleUser,
 } from "@types";
 import { API_BASE_URL } from "@/lib/constants";
-import { db } from "@/lib/db"; // Ensure this path matches where you created db.ts
+import { db } from "@/lib/db";
 import {
   userAtom,
   userRoomsAtom,
@@ -45,20 +44,28 @@ function formatTimestamp(timestamp: string | null): string {
   if (days < 7) return `${days}d`;
   return `${Math.floor(days / 7)}w`;
 }
-
+type ConversationParams = {
+  type: "room" | "dm";
+  id: string;
+  currentUserId: string;
+};
+type MessagesQueryKey = readonly [string, ConversationParams];
 const MESSAGES_PER_PAGE = 30;
-const fetchInitialMessages = async ({ queryKey }: any) => {
+const fetchInitialMessages = async ({
+  queryKey,
+}: QueryFunctionContext<MessagesQueryKey>) => {
   const [, conversation] = queryKey;
   const { type, id, currentUserId } = conversation;
+
   const url =
     type === "room"
       ? `${API_BASE_URL}/chat/room/${id}/messages?skip=0&take=${MESSAGES_PER_PAGE}`
       : `${API_BASE_URL}/chat/dm/${id}?currentUserId=${currentUserId}&skip=0&take=${MESSAGES_PER_PAGE}`;
+
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch messages");
   return res.json();
 };
-
 const listVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -70,7 +77,7 @@ const listVariants = {
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 5 },
   visible: {
     opacity: 1,
@@ -81,9 +88,8 @@ const itemVariants = {
     },
   },
 };
-
-const ConversationItem: React.FC<ConversationItemProps> = React.memo(
-  ({ item, type, isSelected, onClick }) => {
+const ConversationItem = React.memo(
+  ({ item, type, isSelected, onClick }: ConversationItemProps) => {
     const [imgError, setImgError] = useState(false);
 
     useEffect(() => {
@@ -93,15 +99,18 @@ const ConversationItem: React.FC<ConversationItemProps> = React.memo(
     if (!item) return null;
 
     const name = item.name;
-    const imageUrl =
+    const rawImageUrl =
       type === "room"
         ? (item as ChatMapRoom).imageUrl
         : (item as SimpleUser).image;
+
     const placeholder = `https://placehold.co/40x40/zinc/white?text=${name.charAt(0).toUpperCase()}`;
 
     const src =
-      !imgError && imageUrl
-        ? `${API_BASE_URL}/uploads/${imageUrl}`
+      !imgError && rawImageUrl
+        ? rawImageUrl.startsWith("http")
+          ? rawImageUrl
+          : `${API_BASE_URL}/uploads/${rawImageUrl}`
         : placeholder;
 
     const lastMessage = item.lastMessage || "";
@@ -122,7 +131,7 @@ const ConversationItem: React.FC<ConversationItemProps> = React.memo(
         }
       `}
       >
-        <div className="relative flex-shrink-0 mr-3">
+        <div className="relative shrink-0 mr-3">
           <div className="relative w-12 h-12 rounded-full overflow-hidden bg-zinc-800">
             <Image
               src={src}
@@ -139,12 +148,12 @@ const ConversationItem: React.FC<ConversationItemProps> = React.memo(
           )}
         </div>
 
-        <div className="flex-grow min-w-0">
+        <div className="grow min-w-0">
           <div className="flex justify-between items-baseline">
             <h3 className="font-sans font-medium text-base text-zinc-100 truncate pr-2">
               {name}
             </h3>
-            <span className="text-xs text-zinc-500 flex-shrink-0">{time}</span>
+            <span className="text-xs text-zinc-500 shrink-0">{time}</span>
           </div>
           <div className="flex justify-between items-center">
             <p
@@ -155,7 +164,7 @@ const ConversationItem: React.FC<ConversationItemProps> = React.memo(
               )}
             </p>
             {unseenCount > 0 && (
-              <div className="flex-shrink-0 flex items-center justify-center bg-zinc-100 text-zinc-900 text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1">
+              <div className="shrink-0 flex items-center justify-center bg-zinc-100 text-zinc-900 text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1">
                 {unseenCount > 99 ? "99+" : unseenCount}
               </div>
             )}
@@ -281,7 +290,7 @@ const NewChatModal: React.FC = () => {
             />
           </div>
         </div>
-        <div className="flex-grow overflow-y-auto">
+        <div className="grow overflow-y-auto">
           {followingList.length === 0 && (
             <p className="p-4 text-center text-gray-400">
               You are not following anyone.
@@ -309,45 +318,37 @@ export default function NetworkSidebar() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const searchBarRef = useRef<HTMLDivElement>(null);
-  
+
   const [user] = useAtom(userAtom);
   const [userRooms] = useAtom(userRoomsAtom);
   const [dmConversations] = useAtom(dmConversationsAtom);
-  
+
   const [loading] = useAtom(networkLoadingAtom);
   const [error] = useAtom(networkErrorAtom);
-  
+
   const setIsModalOpen = useSetAtom(isNewChatModalOpenAtom);
   const [isModalOpen] = useAtom(isNewChatModalOpenAtom);
   const [isTransitioning] = useAtom(sidebarTransitionLoadingAtom);
   const queryClient = useQueryClient();
 
-  // 1. Live Query from Dexie (Local Source of Truth)
-  // This returns [] initially, but populates very quickly from IndexedDB
   const localRooms = useLiveQuery(() => db.rooms.toArray(), []) || [];
   const localDms = useLiveQuery(() => db.dms.toArray(), []) || [];
-
-  // 2. Sync Effects: When Network Atoms update, update Dexie
-  // We use bulkPut to update existing or add new records
   useEffect(() => {
     if (userRooms.length > 0) {
-      db.rooms.bulkPut(userRooms).catch((err) => 
-        console.error("Failed to sync rooms to cache", err)
-      );
+      db.rooms
+        .bulkPut(userRooms)
+        .catch((err) => console.error("Failed to sync rooms to cache", err));
     }
   }, [userRooms]);
 
   useEffect(() => {
     if (dmConversations.length > 0) {
-      db.dms.bulkPut(dmConversations).catch((err) => 
-        console.error("Failed to sync DMs to cache", err)
-      );
+      db.dms
+        .bulkPut(dmConversations)
+        .catch((err) => console.error("Failed to sync DMs to cache", err));
     }
   }, [dmConversations]);
 
-  // 3. Determine what to display
-  // If network data (atoms) is available, use it (it's freshest).
-  // If not, fall back to local Dexie data (it's fast).
   const displayRooms = userRooms.length > 0 ? userRooms : localRooms;
   const displayDms = dmConversations.length > 0 ? dmConversations : localDms;
 
@@ -370,7 +371,6 @@ export default function NetworkSidebar() {
     });
   }, [displayRooms, displayDms]);
 
-  // Prefetch logic
   useEffect(() => {
     if (user && (userRooms.length > 0 || dmConversations.length > 0)) {
       const conversations = [
@@ -381,7 +381,7 @@ export default function NetworkSidebar() {
         const queryKey = [
           "chat",
           { type: conv.type, id: conv.data.id, currentUserId: user.id },
-        ];
+        ] as MessagesQueryKey;
         queryClient.prefetchInfiniteQuery({
           queryKey: queryKey,
           queryFn: fetchInitialMessages,
@@ -408,19 +408,15 @@ export default function NetworkSidebar() {
 
   const isExpanded = isFocused || searchTerm.length > 0;
 
-  // 4. Render Condition
-  // Show Skeleton ONLY if:
-  // (We are loading profile AND we have no local data to show yet) OR (We are transitioning sidebar)
-  // If we have local data (combinedAndSortedConversations > 0), show it even if profile is loading.
-  const shouldShowSkeleton = 
-    (loading.profile && combinedAndSortedConversations.length === 0) || 
+  const shouldShowSkeleton =
+    (loading.profile && combinedAndSortedConversations.length === 0) ||
     isTransitioning;
 
   return (
     <div className="flex flex-col w-full h-full bg-black border-r border-zinc-800 mt-2 relative">
       {isModalOpen && <NewChatModal />}
-      <div className="flex items-center gap-2 px-3 py-3 flex-shrink-0">
-        <div className="flex-grow" ref={searchBarRef}>
+      <div className="flex items-center gap-2 px-3 py-3 shrink-0">
+        <div className="grow" ref={searchBarRef}>
           <div
             className={`relative flex items-center rounded-full transition-all duration-200 ${isExpanded ? "bg-zinc-800" : "bg-zinc-900"}`}
           >
@@ -451,14 +447,14 @@ export default function NetworkSidebar() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="p-2 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors flex-shrink-0"
+          className="p-2 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors shrink-0"
           id="new-chat-btn"
         >
           <Pencil size={20} />
         </button>
       </div>
 
-      <div className="flex-grow overflow-y-auto custom-scrollbar px-2 mt-4">
+      <div className="grow overflow-y-auto custom-scrollbar px-2 mt-4">
         {shouldShowSkeleton ? (
           <SidebarSkeleton />
         ) : (

@@ -12,6 +12,10 @@ export interface Following {
   username: string;
   name: string;
   image: string | null;
+  lastMessage: string | null;        
+  lastMessageTimestamp: string | null;
+  isOnline?: boolean;           
+  unseenCount?: number;        
 }
 
 export interface Post {
@@ -44,6 +48,7 @@ export interface Gig {
 export interface MapRoom {
   id: string;
   name: string;
+  createdAt:string,
   description: string | null;
   imageUrl: string | null;
   latitude: number;

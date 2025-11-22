@@ -1,5 +1,4 @@
-import { Gig, MapRoom } from "@/store";
-import { SimpleUser } from "@/lib/types";
+import { Gig, MapRoom, SimpleUser } from "@/lib/types";
 
 export interface MapElement extends Omit<MapRoom, "members" | "createdBy"> {
   id: string;

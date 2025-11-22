@@ -54,7 +54,7 @@ export const toggleFollowAtom = atom(null, (get, set, username: string) => {
   }
 });
 
-export const likePostAtom = atom(null, (get) => {
+export const likePostAtom = atom(null, (get, set, postId: number) => {
   const user = get(userAtom);
   if (!user) return;
 });

@@ -237,7 +237,8 @@ router.get("/room/:roomId", async (req, res) => {
 
     const room = await prisma.mapRoom.findUnique({
       where: { id },
-      include: {
+      select: {
+        createdAt: true,
         createdBy: {
           select: { id: true, name: true, username: true, image: true },
         },
@@ -247,7 +248,6 @@ router.get("/room/:roomId", async (req, res) => {
       },
     });
 
-    if (!room) return res.status(404).json({ message: "Room not found" });
     res.json(room);
   } catch (err) {
     res.status(500).json({ message: "Internal server error" });
