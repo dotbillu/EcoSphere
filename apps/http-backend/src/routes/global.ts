@@ -4,7 +4,6 @@ import type { Router as ExpressRouter } from "express";
 
 const router: ExpressRouter = Router();
 
-// --- Global Activity Feed Endpoint ---
 router.get("/feed", async (req, res) => {
   const {
     skip,
@@ -30,7 +29,7 @@ router.get("/feed", async (req, res) => {
         },
       });
       allItems.push(
-        ...posts.map((item) => {
+        ...posts.map((item: any) => {
           const { createdAt, ...rest } = item;
           return {
             type: "post" as const,
@@ -41,7 +40,6 @@ router.get("/feed", async (req, res) => {
       );
     }
 
-    // 2. Gigs Fetch
     if (filterGigs === "true") {
       const gigs = await prisma.gig.findMany({
         orderBy: { createdAt: "desc" },
@@ -52,7 +50,7 @@ router.get("/feed", async (req, res) => {
         },
       });
       allItems.push(
-        ...gigs.map((item) => {
+        ...gigs.map((item: any) => {
           const { createdAt, date, expiresAt, ...rest } = item;
           return {
             type: "gig" as const,
@@ -68,7 +66,6 @@ router.get("/feed", async (req, res) => {
       );
     }
 
-    // 3. Rooms Fetch
     if (filterRooms === "true") {
       const rooms = await prisma.mapRoom.findMany({
         orderBy: { createdAt: "desc" },
@@ -79,7 +76,7 @@ router.get("/feed", async (req, res) => {
         },
       });
       allItems.push(
-        ...rooms.map((item) => {
+        ...rooms.map((item: any) => {
           const { createdAt, ...rest } = item;
           return {
             type: "room" as const,
@@ -100,7 +97,7 @@ router.get("/feed", async (req, res) => {
 
     res.json({ items: paginatedItems, hasNextPage });
   } catch (err) {
-    console.error("Error fetching global feed:", err);
+    console.error(err);
     res.status(500).json({ message: "Internal server error" });
   }
 });

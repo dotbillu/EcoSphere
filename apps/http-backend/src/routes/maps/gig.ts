@@ -40,14 +40,14 @@ router.get("/gigs", async (req, res) => {
       },
     });
 
-    const processedGigs = gigs.map((gig) => ({
+    const processedGigs = gigs.map((gig: any) => ({
       ...gig,
       imageUrls: gig.imageUrls.slice(0, 1),
     }));
 
     res.json(processedGigs);
   } catch (err) {
-    console.error("Error fetching gigs:", err);
+    console.error(err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -123,7 +123,7 @@ router.post("/gig", upload.array("images", 5), async (req, res) => {
     });
     res.status(201).json(newGig);
   } catch (err) {
-    console.error("Error creating gig:", err);
+    console.error(err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -139,7 +139,7 @@ router.delete("/gig/:gigId", async (req, res) => {
     });
     res.status(200).json({ message: "Gig deleted successfully" });
   } catch (err) {
-    console.error("Error deleting gig:", err);
+    console.error(err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -198,7 +198,7 @@ router.put("/gig/:gigId", upload.array("images", 5), async (req, res) => {
 
     res.json({ message: "Gig updated successfully", gig: updatedGig });
   } catch (err) {
-    console.error("Error editing gig:", err);
+    console.error(err);
     res.status(500).json({ message: "Internal server error" });
   }
 });

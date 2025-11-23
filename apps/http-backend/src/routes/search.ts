@@ -28,8 +28,8 @@ router.get("/", async (req, res) => {
       },
     });
     if (user) {
-      followedUsernames = user.following.map((u) => u.username);
-      followedUserIds = user.following.map((u) => u.id);
+      followedUsernames = user.following.map((u: any) => u.username);
+      followedUserIds = user.following.map((u: any) => u.id);
     }
   }
 
@@ -112,17 +112,17 @@ router.get("/", async (req, res) => {
     });
 
     const allItems = [
-      ...users.map((item) => ({
+      ...users.map((item: any) => ({
         type: "user" as const,
         sortDate: new Date(),
         data: item,
       })),
-      ...posts.map((item) => ({
+      ...posts.map((item: any) => ({
         type: "post" as const,
         sortDate: item.createdAt,
         data: { ...item, createdAt: item.createdAt.toISOString() },
       })),
-      ...gigs.map((item) => ({
+      ...gigs.map((item: any) => ({
         type: "gig" as const,
         sortDate: item.createdAt,
         data: {
@@ -132,7 +132,7 @@ router.get("/", async (req, res) => {
           expiresAt: item.expiresAt ? item.expiresAt.toISOString() : null,
         },
       })),
-      ...rooms.map((item) => ({
+      ...rooms.map((item: any) => ({
         type: "room" as const,
         sortDate: item.createdAt,
         data: { ...item, createdAt: item.createdAt.toISOString() },
@@ -184,7 +184,7 @@ router.get("/page", async (req, res) => {
       });
       results = [
         ...results,
-        ...users.map((item) => ({ type: "user" as const, data: item })),
+        ...users.map((item: any) => ({ type: "user" as const, data: item })),
       ];
       if (tab === "people" && users.length === takeNum) {
         nextSkip = skipNum + takeNum;
@@ -215,7 +215,7 @@ router.get("/page", async (req, res) => {
       });
       results = [
         ...results,
-        ...gigs.map((item) => ({ type: "gig" as const, data: item })),
+        ...gigs.map((item: any) => ({ type: "gig" as const, data: item })),
       ];
       if (tab === "gigs" && gigs.length === takeNum) {
         nextSkip = skipNum + takeNum;
@@ -246,7 +246,7 @@ router.get("/page", async (req, res) => {
       });
       results = [
         ...results,
-        ...rooms.map((item) => ({ type: "room" as const, data: item })),
+        ...rooms.map((item: any) => ({ type: "room" as const, data: item })),
       ];
       if (tab === "rooms" && rooms.length === takeNum) {
         nextSkip = skipNum + takeNum;

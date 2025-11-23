@@ -2,6 +2,7 @@ import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import { PrismaClient } from "@prisma/client";
 require("dotenv").config();
+
 const prisma = new PrismaClient();
 const httpServer = createServer();
 
@@ -12,7 +13,7 @@ const io = new Server(httpServer, {
   },
 });
 
-const PORT = process.env.WS_PORT;
+const PORT = process.env.WS_PORT || 8000;
 
 const senderSelect = {
   id: true,
@@ -34,7 +35,6 @@ const messageInclude = {
   reactions: { select: reactionSelect },
 };
 
-// --- Store user ID on the socket instance ---
 interface AuthenticatedSocket extends Socket {
   userId?: string;
 }
@@ -42,7 +42,6 @@ interface AuthenticatedSocket extends Socket {
 io.on("connection", (socket: AuthenticatedSocket) => {
   console.log(`Socket connected: ${socket.id}`);
 
-  // 1. Authenticate user and set as online
   socket.on("authenticate", async (userId: string) => {
     try {
       if (!userId) return;
@@ -55,28 +54,25 @@ io.on("connection", (socket: AuthenticatedSocket) => {
         select: senderSelect,
       });
 
-      // Broadcast to all rooms this user is in that they are online
       const userRooms = await prisma.mapRoom.findMany({
         where: { members: { some: { id: userId } } },
         select: { id: true },
       });
-      userRooms.forEach((room) => {
+      userRooms.forEach((room: any) => {
         socket.to(room.id).emit("user:status", user);
       });
 
       console.log(`User ${userId} authenticated and set as online`);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Authentication error:", err);
     }
   });
 
-  // 2. Join user to all their group chat rooms
   socket.on("join:rooms", (roomIds: string[]) => {
     console.log(`User ${socket.id} joining rooms:`, roomIds);
-    roomIds.forEach((id) => socket.join(id));
+    roomIds.forEach((id: string) => socket.join(id));
   });
 
-  // --- DM Handling ---
   socket.on(
     "dm:send",
     async (data: {
@@ -97,13 +93,12 @@ io.on("connection", (socket: AuthenticatedSocket) => {
 
         socket.emit("dm:confirm", { tempId: data.tempId, message: msg });
         socket.to(data.recipientId).emit("dm:receive", msg);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error sending DM:", err);
       }
     },
   );
 
-  // --- Group Message Handling ---
   socket.on(
     "group:send",
     async (data: {
@@ -126,13 +121,12 @@ io.on("connection", (socket: AuthenticatedSocket) => {
           tempId: data.tempId,
           message: msg,
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error sending group message:", err);
       }
     },
   );
 
-  // --- Reaction Handling ---
   socket.on(
     "reaction:toggle",
     async (data: {
@@ -208,13 +202,12 @@ io.on("connection", (socket: AuthenticatedSocket) => {
             messageId,
           });
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error toggling reaction:", err);
       }
     },
   );
 
-  // --- Delete Message Handling ---
   socket.on(
     "message:delete",
     async (data: {
@@ -250,13 +243,12 @@ io.on("connection", (socket: AuthenticatedSocket) => {
         if (recipientId) {
           io.to(recipientId).emit("message:deleted", messageId);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error deleting message:", err);
       }
     },
   );
 
-  // --- Typing Indicators ---
   socket.on(
     "typing:start",
     (data: {
@@ -265,19 +257,15 @@ io.on("connection", (socket: AuthenticatedSocket) => {
       senderName: string;
     }) => {
       if (data.isGroup) {
-        socket
-          .to(data.conversationId)
-          .emit("user:typing", {
-            conversationId: data.conversationId,
-            name: data.senderName,
-          });
+        socket.to(data.conversationId).emit("user:typing", {
+          conversationId: data.conversationId,
+          name: data.senderName,
+        });
       } else {
-        socket
-          .to(data.conversationId)
-          .emit("user:typing", {
-            conversationId: socket.userId,
-            name: data.senderName,
-          });
+        socket.to(data.conversationId).emit("user:typing", {
+          conversationId: socket.userId,
+          name: data.senderName,
+        });
       }
     },
   );
@@ -297,7 +285,6 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     },
   );
 
-  // --- Handle disconnect: Set user offline ---
   socket.on("disconnect", async () => {
     console.log(`Socket disconnected: ${socket.id}`);
     if (socket.userId) {
@@ -313,11 +300,11 @@ io.on("connection", (socket: AuthenticatedSocket) => {
           select: { id: true },
         });
 
-        userRooms.forEach((room) => {
+        userRooms.forEach((room: any) => {
           socket.to(room.id).emit("user:status", user);
         });
         console.log(`User ${socket.userId} set as offline`);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error on disconnect:", err);
       }
     }
