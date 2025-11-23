@@ -2,7 +2,6 @@
 const nextConfig = {
   images: {
     unoptimized: true,
-
     remotePatterns: [
       {
         protocol: "http",
@@ -23,6 +22,10 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "placehold.co",
+      },
+      {
+        protocol: "https",
+        hostname: "slyme.onrender.com",
       },
     ],
   },
