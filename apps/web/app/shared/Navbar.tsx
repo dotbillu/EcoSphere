@@ -1,20 +1,13 @@
 "use client";
 
-import {
-  House,
-  Map,
-  BotMessageSquare,
-  Network,
-  User,
-  Search,
-} from "lucide-react";
+import { House, Map, Network, User, Search } from "lucide-react";
 import { CurrentPageAtom, PageName, userAtom } from "../store";
 import { useAtom } from "jotai";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { API_BASE_URL } from "@/lib/constants";
-import { UserProfile } from "@/lib/types";
+import { UserProfile } from "@types";
 
 const fetchProfile = async (username: string): Promise<UserProfile> => {
   const res = await fetch(`${API_BASE_URL}/user/profile/${username}`);
@@ -52,7 +45,9 @@ export default function Navbar() {
       staleTime: 60_000,
     });
 
-    fetch(`${API_BASE_URL}/user/profile/${loggedInUser.username}`).catch(() => {});
+    fetch(`${API_BASE_URL}/user/profile/${loggedInUser.username}`).catch(
+      () => {},
+    );
   }, [loggedInUser, queryClient, router]);
 
   useEffect(() => {
@@ -120,4 +115,3 @@ export default function Navbar() {
     </div>
   );
 }
-

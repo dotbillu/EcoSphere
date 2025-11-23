@@ -9,7 +9,7 @@ import {
   MessageType,
 } from "@/lib/types";
 
-export type PageName = "House" | "Map" | "Search" | "Network" | "Activity";
+export type PageName = "House" | "Map" | "Search" | "Network" | "Activity" | "profile";
 export const CurrentPageAtom = atom<PageName>("House");
 
 interface LocationState {
@@ -49,6 +49,8 @@ export const toggleFollowAtom = atom(null, (get, set, username: string) => {
         username: username,
         name: username,
         image: null,
+        lastMessage: null,
+        lastMessageTimestamp: null,
       },
     ]);
   }

@@ -202,6 +202,8 @@ export default function Profile() {
         username: loggedInUser.username,
         name: loggedInUser.name,
         image: loggedInUser.image ?? null,
+        lastMessage: null,
+        lastMessageTimestamp: null,
       };
 
       const alreadyFollowing = oldProfile.followers.some(
@@ -344,7 +346,7 @@ export default function Profile() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`relative flex-grow py-4 px-3 text-sm font-medium transition-colors ${
+                className={`relative grow py-4 px-3 text-sm font-medium transition-colors ${
                   activeTab === tab
                     ? "text-white"
                     : "text-zinc-500 hover:bg-zinc-900/70"

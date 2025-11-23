@@ -2,13 +2,10 @@
 
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { MapRoom } from "@/lib/types"; 
-import { getImageUrl } from "../../lib/utils";
+import { MapRoom } from "@types"; 
+import { getImageUrl } from "@lib/utils";
 import Link from "next/link";
 
-// -----------------------------------------------------------------
-// ProfileRoom Component
-// -----------------------------------------------------------------
 export default function ProfileRoom({ room }: { room: MapRoom }) {
   return (
     <Link href={`/map?roomId=${room.id}`} className="block">
@@ -31,13 +28,12 @@ export default function ProfileRoom({ room }: { room: MapRoom }) {
               className="bg-zinc-800"
             />
           </div>
-          {/* Room Info */}
           <div className="flex flex-col">
             <p className="text-zinc-400 text-sm uppercase tracking-wide">
               {room.type || "Room"}
             </p>
             <h3 className="text-lg font-bold text-white">{room.name}</h3>
-            <p className="text-zinc-300 whitespace-pre-wrap break-words line-clamp-3 mt-1 text-sm">
+            <p className="text-zinc-300 whitespace-pre-wrap wrap-break-words line-clamp-3 mt-1 text-sm">
               {room.description}
             </p>
           </div>

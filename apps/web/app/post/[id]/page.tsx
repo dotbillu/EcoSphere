@@ -19,43 +19,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { getImageUrl } from "@lib/utils";
 import { API_BASE_URL } from "@/lib/constants";
+import { Post, SimpleUser } from "@/lib/types";
 
-// --- Type Definitions (Updated for UUIDs) ---
-interface UserInfo {
-  name: string;
-  username: string;
-  image: string | null;
-}
-interface Comment {
-  id: string | number; // Updated to string | number (number is for optimistic temp ID)
+type PostComment = {
+  id: string | number;
   content: string;
   createdAt: string;
-  user: UserInfo;
-}
-interface Like {
-  userId: string; // CHANGED: from number to string (UUID)
-  user: {
-    username: string;
-  };
-}
-interface FullPost {
-  id: string; // CHANGED: from number to string (UUID)
-  username: string;
-  name?: string;
-  content: string;
-  imageUrls: string[];
-  createdAt: string;
-  location?: string;
-  user: UserInfo;
-  likes: Like[];
-  comments: Comment[];
-  _count: {
-    likes: number;
-    comments: number;
-  };
-}
+  user: SimpleUser;
+};
 
-// --- Image Grid Component ---
+type PostDetail = Post & {
+  comments: PostComment[];
+  user: SimpleUser;
+};
+
 const PostImageGrid = ({
   imageUrls,
   openModal,
@@ -79,6 +56,7 @@ const PostImageGrid = ({
           src={getImageUrl(imageUrls[0])}
           alt="Post image"
           fill
+          sizes="(max-width: 768px) 100vw, 600px"
           style={{ objectFit: "cover" }}
         />
       </div>
@@ -97,6 +75,7 @@ const PostImageGrid = ({
               src={getImageUrl(url)}
               alt={`Post image ${index + 1}`}
               fill
+              sizes="(max-width: 768px) 50vw, 300px"
               style={{ objectFit: "cover" }}
             />
           </div>
@@ -115,6 +94,7 @@ const PostImageGrid = ({
             src={getImageUrl(imageUrls[0])}
             alt="Post image 1"
             fill
+            sizes="(max-width: 768px) 50vw, 300px"
             style={{ objectFit: "cover" }}
           />
         </div>
@@ -126,6 +106,7 @@ const PostImageGrid = ({
             src={getImageUrl(imageUrls[1])}
             alt="Post image 2"
             fill
+            sizes="(max-width: 768px) 50vw, 300px"
             style={{ objectFit: "cover" }}
           />
         </div>
@@ -137,13 +118,13 @@ const PostImageGrid = ({
             src={getImageUrl(imageUrls[2])}
             alt="Post image 3"
             fill
+            sizes="(max-width: 768px) 50vw, 300px"
             style={{ objectFit: "cover" }}
           />
         </div>
       </div>
     );
   }
-  // For 4 or more images
   return (
     <div className={`${gridBase} grid grid-cols-2 grid-rows-2 gap-0.5`}>
       {imageUrls.slice(0, 4).map((url, index) => (
@@ -156,6 +137,7 @@ const PostImageGrid = ({
             src={getImageUrl(url)}
             alt={`Post image ${index + 1}`}
             fill
+            sizes="(max-width: 768px) 50vw, 300px"
             style={{ objectFit: "cover" }}
           />
           {count > 4 && index === 3 && (
@@ -169,9 +151,8 @@ const PostImageGrid = ({
   );
 };
 
-// --- Post Detail Page Component ---
 export default function PostDetailPage() {
-  const [post, setPost] = useState<FullPost | null>(null);
+  const [post, setPost] = useState<PostDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -180,14 +161,13 @@ export default function PostDetailPage() {
 
   const router = useRouter();
   const params = useParams();
-  const { id: postId } = params; // postId is already a string (UUID)
+  const { id: postId } = params;
 
   const [user] = useAtom(userAtom);
-  const currentUserId = user?.id; // currentUserId is a string (UUID)
+  const currentUserId = user?.id;
   const currentUserImage = user?.image;
   const currentUserStatus = user ? "authenticated" : "unauthenticated";
 
-  // Like Debounce Timer
   const likeDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -195,10 +175,9 @@ export default function PostDetailPage() {
     const fetchPost = async () => {
       setLoading(true);
       try {
-        // postId is a string
-        const res = await fetch(`${API_BASE_URL}/posts/${postId}`);
+        const res = await fetch(`${API_BASE_URL}/feed/posts/${postId}`);
         if (!res.ok) throw new Error("Post not found");
-        const data: FullPost = await res.json();
+        const data: PostDetail = await res.json();
         setPost(data);
       } catch (err) {
         console.error(err);
@@ -209,7 +188,6 @@ export default function PostDetailPage() {
     fetchPost();
   }, [postId]);
 
-  // --- Modal Functions ---
   const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
 
   const openModal = useCallback((e: React.MouseEvent, index: number) => {
@@ -239,77 +217,68 @@ export default function PostDetailPage() {
     );
   };
 
-  // --- Like Toggle (Optimistic Update + Debounce) ---
   const handleLikeToggle = () => {
     if (!currentUserId || !post) return;
 
-    // Compare string UUIDs
     const isLiked = post.likes.some((like) => like.userId === currentUserId);
 
-    // 1. Optimistic UI Update
     setPost((prevPost) => {
       if (!prevPost) return null;
       if (isLiked) {
         return {
           ...prevPost,
-          // Filter using string ID
           likes: prevPost.likes.filter((like) => like.userId !== currentUserId),
           _count: { ...prevPost._count, likes: prevPost._count.likes - 1 },
         };
       } else {
         return {
           ...prevPost,
-          likes: [
-            ...prevPost.likes,
-            // Mock like object using string ID
-            { userId: currentUserId, user: { username: user?.username || "" } },
-          ],
+          likes: [...prevPost.likes, { userId: currentUserId }],
           _count: { ...prevPost._count, likes: prevPost._count.likes + 1 },
         };
       }
     });
 
-    // 2. Clear any pending network request
     if (likeDebounceTimer.current) {
       clearTimeout(likeDebounceTimer.current);
     }
 
-    // 3. Set a new timer to send the actual request
     likeDebounceTimer.current = setTimeout(async () => {
       try {
-        // postId is a string
-        const res = await fetch(`${API_BASE_URL}/posts/${post.id}/like`, {
+        const res = await fetch(`${API_BASE_URL}/api/posts/${post.id}/like`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          // Send userId as string
           body: JSON.stringify({ userId: currentUserId }),
         });
         if (!res.ok) throw new Error("API call failed");
       } catch (err) {
         console.error("Failed to toggle like (server):", err);
-        // NOTE: Manual rollback is still necessary here on error.
       }
-    }, 1000); // 1-second debounce
+    }, 1000);
   };
 
-  // --- Comment Submission ---
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUserId || !post || !comment.trim()) return;
 
     setIsSubmitting(true);
-    const newCommentTemp: Comment = {
-      id: Date.now(), // Temp ID (still a number for optimistic ID)
-      content: comment,
-      createdAt: new Date().toISOString(),
-      user: {
-        name: user?.name || user?.username || "You",
-        username: user?.username || "current_user",
-        image: currentUserImage || null,
-      },
+
+    const optimisticUser: SimpleUser = {
+      id: currentUserId,
+      username: user?.username || "current_user",
+      name: user?.name || user?.username || "You",
+      image: currentUserImage || null,
+      lastMessage: null,
+      lastMessageTimestamp: null,
     };
 
-    // Optimistic Comment Add
+    const newCommentTemp: PostComment = {
+      id: Date.now(),
+      content: comment,
+      createdAt: new Date().toISOString(),
+      user: optimisticUser,
+    };
+
     setPost((prevPost) => {
       if (!prevPost) return null;
       return {
@@ -324,28 +293,22 @@ export default function PostDetailPage() {
     setComment("");
 
     try {
-      // postId is a string
-      const res = await fetch(
-        `${API_BASE_URL}/posts/${post.id}/comment`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: currentUserId, // userId is a string
-            content: newCommentTemp.content,
-          }),
-        },
-      );
+      const res = await fetch(`${API_BASE_URL}/posts/${post.id}/comment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUserId,
+          content: newCommentTemp.content,
+        }),
+      });
       if (!res.ok) throw new Error("Failed to post comment");
 
-      const finalComment: Comment = await res.json();
+      const finalComment: PostComment = await res.json();
 
-      // Replace optimistic comment with final comment from server
       setPost((prevPost) => {
         if (!prevPost) return null;
         return {
           ...prevPost,
-          // Match by temp number ID, replace with final object which has the final string ID
           comments: prevPost.comments.map((c) =>
             c.id === newCommentTemp.id ? finalComment : c,
           ),
@@ -353,7 +316,6 @@ export default function PostDetailPage() {
       });
     } catch (err) {
       console.error("Failed to post comment:", err);
-      // Rollback optimistic comment on failure
       setPost((prevPost) => {
         if (!prevPost) return null;
         return {
@@ -365,7 +327,6 @@ export default function PostDetailPage() {
           },
         };
       });
-      // Restore comment text for user to try again
       setComment(newCommentTemp.content);
     } finally {
       setIsSubmitting(false);
@@ -402,7 +363,6 @@ export default function PostDetailPage() {
 
   return (
     <div className="w-full max-w-2xl mx-auto border-l border-r border-gray-700 min-h-screen bg-black">
-      {/* Header */}
       <div className="sticky top-0 bg-black/80 backdrop-blur-md z-10 flex items-center gap-4 p-4 border-b border-gray-700">
         <button
           onClick={() => router.back()}
@@ -413,9 +373,8 @@ export default function PostDetailPage() {
         <h1 className="text-xl font-bold text-white">Post</h1>
       </div>
 
-      {/* Main Post */}
       <div className="flex space-x-3 p-4 border-b border-gray-700">
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <Link href={`/profile/${post.username}`}>
             {post.user?.image ? (
               <Image
@@ -426,7 +385,7 @@ export default function PostDetailPage() {
                 className="rounded-full object-cover w-10 h-10"
               />
             ) : (
-              <div className="bg-neutral-focus text-neutral-content rounded-full w-10 h-10 flex items-center justify-center">
+              <div className="bg-neutral-focus text-neutral-content rounded-full w-10 h-10 flex items-center justify-center bg-gray-600">
                 {post.username[0].toUpperCase()}
               </div>
             )}
@@ -448,7 +407,7 @@ export default function PostDetailPage() {
             {new Date(post.createdAt).toLocaleString()}
           </p>
 
-          <p className="text-white mt-4 whitespace-pre-wrap break-words text-lg">
+          <p className="text-white mt-4 whitespace-pre-wrap wrap-break-words text-lg">
             {post.content}
           </p>
 
@@ -459,17 +418,16 @@ export default function PostDetailPage() {
             </p>
           )}
 
-          {/* New Image Grid Component */}
           <PostImageGrid imageUrls={post.imageUrls} openModal={openModal} />
 
-          {/* Action Bar */}
           <div className="flex items-center gap-6 mt-4 text-zinc-500">
-            {/* Like Button */}
             <button
               onClick={handleLikeToggle}
               disabled={currentUserStatus !== "authenticated"}
               className={`flex items-center gap-1.5 transition-colors duration-200 group ${
-                isLikedByCurrentUserFinal ? "text-red-500" : "hover:text-red-500"
+                isLikedByCurrentUserFinal
+                  ? "text-red-500"
+                  : "hover:text-red-500"
               } ${currentUserStatus !== "authenticated" ? "opacity-50" : ""}`}
             >
               <Heart
@@ -480,7 +438,6 @@ export default function PostDetailPage() {
               <span className="text-sm">{post._count.likes}</span>
             </button>
 
-            {/* Comment Count */}
             <div className="flex items-center gap-1.5">
               <MessageCircle size={18} />
               <span className="text-sm">{post._count.comments}</span>
@@ -489,13 +446,12 @@ export default function PostDetailPage() {
         </div>
       </div>
 
-      {/* Comment Form */}
       {currentUserStatus === "authenticated" && (
         <form
           onSubmit={handleCommentSubmit}
           className="flex gap-3 p-4 border-b bg-black border-gray-700"
         >
-          <div className="flex-shrink-0 mt-2">
+          <div className="shrink-0 mt-2">
             {currentUserImage ? (
               <Image
                 src={getImageUrl(currentUserImage)}
@@ -505,7 +461,7 @@ export default function PostDetailPage() {
                 className="rounded-full object-cover w-10 h-10"
               />
             ) : (
-              <div className="bg-neutral-focus text-neutral-content rounded-full w-10 h-10 flex items-center justify-center">
+              <div className="bg-neutral-focus text-neutral-content rounded-full w-10 h-10 flex items-center justify-center bg-gray-600">
                 {user?.username[0].toUpperCase()}
               </div>
             )}
@@ -514,7 +470,7 @@ export default function PostDetailPage() {
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Post your reply"
-            className="textarea textarea-bordered w-full bg-zinc-900 text-white placeholder-zinc-500  p-2 rounded-lg  resize-none"
+            className="textarea textarea-bordered w-full bg-zinc-900 text-white placeholder-zinc-500  p-2 rounded-lg  resize-none focus:outline-none focus:ring-1 focus:ring-zinc-600"
             rows={2}
           />
           <button
@@ -545,7 +501,7 @@ export default function PostDetailPage() {
             animate={{ opacity: 1, y: 0 }}
             className="flex space-x-3 p-4 border-b border-gray-700"
           >
-            <div className="flex-shrink-0">
+            <div className="shrink-0">
               <Link href={`/profile/${comment.user.username}`}>
                 {comment.user.image ? (
                   <Image
@@ -556,7 +512,7 @@ export default function PostDetailPage() {
                     className="rounded-full object-cover w-10 h-10"
                   />
                 ) : (
-                  <div className="bg-neutral-focus text-neutral-content rounded-full w-10 h-10 flex items-center justify-center">
+                  <div className="bg-neutral-focus text-neutral-content rounded-full w-10 h-10 flex items-center justify-center bg-gray-600">
                     {comment.user.username[0].toUpperCase()}
                   </div>
                 )}
@@ -578,7 +534,7 @@ export default function PostDetailPage() {
                   · {new Date(comment.createdAt).toLocaleDateString()}
                 </p>
               </div>
-              <p className="text-white mt-1 whitespace-pre-wrap break-words">
+              <p className="text-white mt-1 whitespace-pre-wrap wrap-break-words">
                 {comment.content}
               </p>
             </div>
@@ -586,7 +542,6 @@ export default function PostDetailPage() {
         ))}
       </div>
 
-      {/* Image Modal */}
       <AnimatePresence>
         {isModalOpen && post.imageUrls.length > 0 && (
           <motion.div
@@ -597,7 +552,7 @@ export default function PostDetailPage() {
             onClick={closeModal}
           >
             <button
-              className="absolute top-4 right-4 text-white z-[60] p-2 bg-black/50 rounded-full hover:bg-black/80 transition-colors"
+              className="absolute top-4 right-4 text-white z-60 p-2 bg-black/50 rounded-full hover:bg-black/80 transition-colors"
               onClick={closeModal}
             >
               <X size={32} />
@@ -618,7 +573,9 @@ export default function PostDetailPage() {
                 src={getImageUrl(post.imageUrls[modalImageIndex])}
                 alt="Post image expanded"
                 fill
-                style={{ objectFit: "contain" }}
+                sizes="90vw"
+                className="object-contain"
+                priority
               />
               {post.imageUrls.length > 1 && (
                 <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white bg-black/50 px-3 py-1 rounded-full text-sm">
@@ -628,7 +585,7 @@ export default function PostDetailPage() {
             </div>
             {post.imageUrls.length > 1 && (
               <button
-                className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-[60] hover:bg-black/80 transition-colors"
+                className="absolute right-4 p-2 bg-black/50 rounded-full text-white z-60 hover:bg-black/80 transition-colors"
                 onClick={showNextImage}
               >
                 <ChevronRight size={32} />
