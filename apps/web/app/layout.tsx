@@ -37,6 +37,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [status, path, router]);
 
+  // loading
   if (status === "loading") {
     return (
       <div className="fixed inset-0 bg-black flex items-center justify-center z-50 min-h-dvh w-screen">
@@ -55,9 +56,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (session) {
     return (
-      <div className="bg-black min-h-dvh w-screen flex flex-col">
-        <div className="flex-1 overflow-y-auto">{children}</div>
-        <Navbar />
+      <div className="bg-black min-h-dvh w-screen relative flex flex-col">
+        {/* scrollable content */}
+        <div className="flex-1 overflow-y-auto pb-[72px]">{children}</div>
+
+        {/* floating bottom navbar */}
+        <div className="fixed bottom-0 left-0 w-full z-50">
+          <Navbar />
+        </div>
       </div>
     );
   }
