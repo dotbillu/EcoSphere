@@ -15,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="bg-black">
-      <body className="bg-black min-h-screen">
+      <body className="bg-black min-h-dvh">
         <Provider>
           <SessionProvider>
             <AuthGuard>{children}</AuthGuard>
@@ -39,7 +39,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (status === "loading") {
     return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center z-50 min-h-screen w-screen">
+      <div className="fixed inset-0 bg-black flex items-center justify-center z-50 min-h-dvh w-screen">
         <span className="loading loading-dots loading-xl text-white"></span>
       </div>
     );
@@ -47,7 +47,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (status === "unauthenticated" && path === "/login") {
     return (
-      <div className="bg-black min-h-screen w-screen flex flex-col">
+      <div className="bg-black min-h-dvh w-screen flex flex-col">
         {children}
       </div>
     );
@@ -55,7 +55,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (session) {
     return (
-      <div className="bg-black h-screen w-screen flex flex-col">
+      <div className="bg-black min-h-dvh w-screen flex flex-col">
         <div className="flex-1 overflow-y-auto">{children}</div>
         <Navbar />
       </div>
