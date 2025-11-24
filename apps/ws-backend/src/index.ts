@@ -13,7 +13,7 @@ const io = new Server(httpServer, {
   },
 });
 
-const PORT = process.env.WS_PORT || 8000;
+const LISTENING_PORT = parseInt(process.env.WS_PORT || "8213");
 
 const senderSelect = {
   id: true,
@@ -311,6 +311,6 @@ io.on("connection", (socket: AuthenticatedSocket) => {
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`WS server running on http://localhost:${PORT}`);
+httpServer.listen(LISTENING_PORT, "0.0.0.0", () => {
+  console.log(`live on port :${LISTENING_PORT}`);
 });
