@@ -21,6 +21,4 @@ app.use("/search", searchRoutes);
 app.use("/global", globalRoutes);
 app.use("/chat", chatRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
-});
+app.listen(PORT);
