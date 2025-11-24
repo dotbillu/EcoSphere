@@ -15,7 +15,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="bg-black">
-      <body className="bg-black min-h-screen overscroll-none">
+      {/* Added overscroll-none to prevent rubber-banding on mobile */}
+      <body className="bg-black h-[100dvh] w-full overscroll-none">
         <Provider>
           <SessionProvider>
             <AuthGuard>{children}</AuthGuard>
@@ -39,7 +40,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (status === "loading") {
     return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-black flex items-center justify-center z-50 h-[100dvh] w-full">
         <span className="loading loading-dots loading-xl text-white"></span>
       </div>
     );
@@ -47,7 +48,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (status === "unauthenticated" && path === "/login") {
     return (
-      <div className="bg-black min-h-screen w-full flex flex-col">
+      <div className="bg-black h-dvh w-full flex flex-col overflow-y-auto">
         {children}
       </div>
     );
@@ -55,13 +56,12 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (session) {
     return (
-      <div className="fixed inset-0 bg-black flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto overflow-x-hidden relative w-full">
+      <div className="bg-black relative h-dvh w-full overflow-hidden">
+        <div className="h-full w-full overflow-y-auto pb-24">
           {children}
         </div>
-        
-        <div className="flex-none z-50 w-full bg-black">
-          <Navbar />
+        <div className="fixed bottom-0 left-0 right-0 w-full z-50">
+           <Navbar />
         </div>
       </div>
     );
