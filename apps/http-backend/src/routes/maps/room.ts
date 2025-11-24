@@ -16,6 +16,7 @@ router.get("/rooms", async (req, res) => {
         longitude: true,
         type: true,
         imageUrl: true,
+        createdAt:true,
         createdBy: {
           select: {
             id: true,
@@ -35,6 +36,7 @@ router.get("/rooms", async (req, res) => {
       },
     });
     res.json(rooms);
+    console.log(rooms)
   } catch (err) {
     res.status(500).json({ message: "Internal server error" });
   }

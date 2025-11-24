@@ -3,6 +3,7 @@ import { Gig, MapRoom, SimpleUser } from "@/lib/types";
 export interface MapElement extends Omit<MapRoom, "members" | "createdBy"> {
   id: string;
   creatorId?: string;
+  createdAt: string;
   createdBy?: {
     id: string;
     name: string;

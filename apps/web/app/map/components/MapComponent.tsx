@@ -12,8 +12,8 @@ import { useAtom } from "jotai";
 import { GoogleMap, useJsApiLoader, MarkerF } from "@react-google-maps/api";
 import { useSearchParams, useRouter } from "next/navigation";
 import { locationAtom, userAtom } from "@/store";
-import { Home, Star } from "lucide-react";
-import { AnimatePresence } from "framer-motion";
+import { Home, Star, MoreVertical, Plus, Check } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { getImageUrl, getHaversineDistanceInMeters } from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/constants";
 
@@ -51,6 +51,7 @@ function MapContent() {
   const [showGigs, setShowGigs] = useState(true);
   const [isLightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -375,62 +376,83 @@ function MapContent() {
         />
       )}
 
-      <div className="absolute top-4 right-4 z-30 flex flex-col gap-2 rounded-lg bg-black/70 p-2 backdrop-blur-md border border-zinc-700 shadow-lg">
+      <div className="absolute top-4 right-4 z-30 flex flex-col items-end">
         <button
-          onClick={() => setShowRooms(!showRooms)}
-          className={`flex items-center justify-between gap-4 px-3 py-2 rounded-md transition ${
-            showRooms
-              ? "bg-zinc-700 text-white"
-              : "hover:bg-zinc-800 text-zinc-400"
-          }`}
+          onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black shadow-lg transition-all hover:bg-zinc-100"
         >
-          <span className="text-sm font-medium">Rooms</span>
-          <Home size={18} />
+          <MoreVertical size={24} />
         </button>
-        <button
-          onClick={() => setShowGigs(!showGigs)}
-          className={`flex items-center justify-between gap-4 px-3 py-2 rounded-md transition ${
-            showGigs
-              ? "bg-zinc-700 text-white"
-              : "hover:bg-zinc-800 text-zinc-400"
-          }`}
-        >
-          <span className="text-sm font-medium">Gigs</span>
-          <Star size={18} />
-        </button>
+        <AnimatePresence>
+          {isFilterMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              transition={{ duration: 0.1 }}
+              className="mt-2 flex min-w-160px flex-col gap-2 rounded-xl bg-white p-2 shadow-xl"
+            >
+              <button
+                onClick={() => setShowRooms(!showRooms)}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                  showRooms
+                    ? "bg-zinc-100 text-black"
+                    : "text-zinc-500 hover:bg-zinc-50"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Home size={16} />
+                  <span>Rooms</span>
+                </div>
+                {showRooms && <Check size={14} />}
+              </button>
+              <button
+                onClick={() => setShowGigs(!showGigs)}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                  showGigs
+                    ? "bg-zinc-100 text-black"
+                    : "text-zinc-500 hover:bg-zinc-50"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Star size={16} />
+                  <span>Gigs</span>
+                </div>
+                {showGigs && <Check size={14} />}
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <div className="absolute top-4 left-4 z-30 flex items-center bg-white rounded-full p-1 shadow-xl md:hidden">
+      <div className="absolute bottom-3 right-4 z-30 flex flex-col items-end gap-4 md:bottom-8">
         <button
           onClick={() => setRoomModalOpen(true)}
-          className="p-2 bg-white hover:bg-zinc-100 text-black rounded-full transition-all"
+          className="group relative flex h-14 w-14 items-center justify-center rounded-full bg-white text-black shadow-lg transition-all hover:bg-zinc-100 md:h-auto md:w-auto md:px-5 md:py-3"
         >
-          <Home size={18} />
+          <div className="relative">
+            <Home size={24} />
+            <div className="absolute -right-2 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black text-white md:hidden">
+              <Plus size={12} />
+            </div>
+          </div>
+          <span className="ml-2 hidden text-sm font-semibold md:block">
+            Create Room
+          </span>
         </button>
-        <div className="w-px h-4 bg-zinc-300 mx-1"></div>
         <button
           onClick={() => setGigModalOpen(true)}
-          className="p-2 bg-white hover:bg-zinc-100 text-black rounded-full transition-all"
+          className="group relative flex h-14 w-14 items-center justify-center rounded-full bg-white text-black shadow-lg transition-all hover:bg-zinc-100 md:h-auto md:w-auto md:px-5 md:py-3"
         >
-          <Star size={18} />
-        </button>
-      </div>
-
-      <div className="absolute top-4 left-4 z-30 hidden items-center bg-white rounded-full p-1 shadow-xl md:flex">
-        <button
-          onClick={() => setRoomModalOpen(true)}
-          className="px-3 py-2 bg-white hover:bg-zinc-100 text-black rounded-l-full flex items-center justify-center gap-2 transition-all"
-        >
-          <Home size={16} />
-          <span className="text-sm font-medium">Create Room</span>
-        </button>
-        <div className="w-px h-5 bg-zinc-300 mx-px"></div>
-        <button
-          onClick={() => setGigModalOpen(true)}
-          className="px-3 py-2 bg-white hover:bg-zinc-100 text-black rounded-r-full flex items-center justify-center gap-2 transition-all"
-        >
-          <Star size={16} />
-          <span className="text-sm font-medium">Create Gig</span>
+          <div className="relative">
+            <Star size={24} />
+            <div className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-black text-white md:hidden">
+              <Plus size={12} />
+            </div>
+          </div>
+          <span className="ml-2 hidden text-sm font-semibold md:block">
+            Create Gig
+          </span>
         </button>
       </div>
 
