@@ -5,7 +5,6 @@ import type { Router as ExpressRouter } from "express";
 
 const router: ExpressRouter = Router();
 
-// Route: POST /feedpost/uploadPosts
 router.post("/uploadPosts", upload.array("images", 5), async (req, res) => {
   try {
     const { username, name, content, location } = req.body;
@@ -15,7 +14,7 @@ router.post("/uploadPosts", upload.array("images", 5), async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const imageUrls = imageFiles?.map((file) => file.filename) || [];
+    const imageUrls = imageFiles?.map((file) => file.path) || [];
 
     const post = await prisma.post.create({
       data: {

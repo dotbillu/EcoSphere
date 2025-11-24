@@ -166,11 +166,11 @@ router.patch(
       }
 
       if (imageFile) {
-        updateData.image = imageFile.filename;
+        updateData.image = imageFile.path;
       }
 
       if (posterImageFile) {
-        updateData.posterImage = posterImageFile.filename;
+        updateData.posterImage = posterImageFile.path;
       }
 
       if (Object.keys(updateData).length > 0) {

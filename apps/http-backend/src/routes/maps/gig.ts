@@ -87,7 +87,7 @@ router.post("/gig", upload.array("images", 5), async (req, res) => {
       });
     }
 
-    const imageUrls = imageFiles ? imageFiles.map((file) => file.filename) : [];
+    const imageUrls = imageFiles ? imageFiles.map((file) => file.path) : [];
 
     const data: any = {
       title,
@@ -166,7 +166,7 @@ router.put("/gig/:gigId", upload.array("images", 5), async (req, res) => {
       expiresAt: expiresAt ? new Date(expiresAt) : existingGig.expiresAt,
       imageUrls:
         imageFiles && imageFiles.length > 0
-          ? imageFiles.map((f) => f.filename)
+          ? imageFiles.map((f) => f.path)
           : existingGig.imageUrls,
     };
 

@@ -9,12 +9,10 @@ import chatRoutes from "@chats";
 require("dotenv").config();
 
 const app = express();
-const PORT = process.env.HTTP_PORT
+const PORT = process.env.HTTP_PORT;
 
 app.use(cors());
 app.use(express.json());
-
-app.use("/uploads", express.static("uploads"));
 
 app.use("/user", userRoutes);
 app.use("/feed", postRoutes);

@@ -293,7 +293,7 @@ export default function PostDetailPage() {
     setComment("");
 
     try {
-      const res = await fetch(`${API_BASE_URL}/posts/${post.id}/comment`, {
+      const res = await fetch(`${API_BASE_URL}/feed/posts/${post.id}/comment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

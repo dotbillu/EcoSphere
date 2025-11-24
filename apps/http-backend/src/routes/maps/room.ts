@@ -73,7 +73,8 @@ router.post("/room", upload.single("image"), async (req, res) => {
         longitude: lon,
         type: type?.trim() || null,
         creatorId: creatorId,
-        imageUrl: imageFile ? imageFile.filename : null,
+        // CHANGED: Use .path for Cloudinary URL
+        imageUrl: imageFile ? imageFile.path : null,
         members: {
           connect: { id: creatorId },
         },
@@ -207,7 +208,8 @@ router.put("/room/:roomId", upload.single("image"), async (req, res) => {
       name: name?.trim() || existingRoom.name,
       description: description?.trim() || existingRoom.description,
       type: type?.trim() || existingRoom.type,
-      imageUrl: imageFile ? imageFile.filename : existingRoom.imageUrl,
+      // CHANGED: Use .path for Cloudinary URL
+      imageUrl: imageFile ? imageFile.path : existingRoom.imageUrl,
     };
 
     const updatedRoom = await prisma.mapRoom.update({
