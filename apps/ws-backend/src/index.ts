@@ -13,7 +13,7 @@ const io = new Server(httpServer, {
   },
 });
 
-const LISTENING_PORT = parseInt(process.env.WS_PORT || "8213");
+const LISTENING_PORT = parseInt(process.env.PORT || process.env.WS_PORT || "8213");
 
 const senderSelect = {
   id: true,
