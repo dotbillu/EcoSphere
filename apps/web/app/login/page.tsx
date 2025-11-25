@@ -1,7 +1,7 @@
 "use client";
 
 import { signIn, useSession } from "next-auth/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAtom } from "jotai";
 import { userAtom } from "@/store";
@@ -13,10 +13,13 @@ export default function LoginPage() {
   const router = useRouter();
   const [, setUser] = useAtom(userAtom);
 
+  const isSyncing = useRef(false);
+
   useEffect(() => {
-    if (!session?.user) return;
+    if (!session?.user || isSyncing.current) return;
 
     const currentUser = session.user;
+    isSyncing.current = true;
 
     const syncUser = async () => {
       try {
@@ -30,9 +33,12 @@ export default function LoginPage() {
           }),
         });
 
+        if (!res.ok) throw new Error("Backend error");
+
         const userData: User = await res.json();
         setUser(userData);
-        console.log(userData);
+        console.log("Sync successful");
+
         router.push("/house");
       } catch (err) {
         console.error("Failed to sync user:", err);
@@ -44,7 +50,6 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black">
-      <h1 className="text-3xl font-bold mb-6 text-white">Login to EcoSphere</h1>
 
       {!session?.user && (
         <button
@@ -78,7 +83,9 @@ export default function LoginPage() {
         </button>
       )}
 
-      {session?.user && <p className="text-white">Logging you in...</p>}
+      {session?.user && (
+        <span className="loading loading-infinity loading-xl"></span>
+      )}
     </div>
   );
 }

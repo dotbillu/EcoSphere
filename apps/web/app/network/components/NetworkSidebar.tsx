@@ -236,84 +236,160 @@ const NewChatModal: React.FC = () => {
   const setIsModalOpen = useSetAtom(isNewChatModalOpenAtom);
   const setDmConversations = useSetAtom(dmConversationsAtom);
   const setSelectedConversation = useSetAtom(selectedConversationAtom);
+  
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedUser, setSelectedUser] = useState<SimpleUser | null>(null);
 
   const filteredFollowing = followingList.filter(
     (user) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase()),
+      user.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSelectUser = (user: SimpleUser) => {
+  const getPlaceholderColor = (str: string) => {
+    const colors = [
+      "bg-red-600",
+      "bg-blue-600",
+      "bg-green-600",
+      "bg-yellow-600",
+      "bg-purple-600",
+      "bg-pink-600",
+      "bg-indigo-600",
+      "bg-orange-600",
+      "bg-teal-600",
+    ];
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  const handleStartChat = () => {
+    if (!selectedUser) return;
+
     setIsModalOpen(false);
     setDmConversations((prev) => {
-      const existingDm = prev.find((dm) => dm.id === user.id);
-      if (!existingDm) return [user, ...prev];
+      const existingDm = prev.find((dm) => dm.id === selectedUser.id);
+      if (!existingDm) return [selectedUser, ...prev];
       return prev;
     });
-    setSelectedConversation({ type: "dm", data: user });
+    setSelectedConversation({ type: "dm", data: selectedUser });
   };
 
   const onClose = () => setIsModalOpen(false);
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 z-40 flex justify-center items-center"
+      className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center"
       onClick={onClose}
     >
       <div
-        className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md m-4 flex flex-col h-[70vh] text-gray-200"
+        className="bg-[#262626] rounded-xl shadow-2xl w-full max-w-md m-4 flex flex-col h-[70vh] md:h-[600px] text-white overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center p-4 border-b border-gray-700">
-          <h2 className="text-lg font-semibold">New Message</h2>
+        <div className="flex justify-between items-center p-4 border-b border-gray-800 relative">
+          <div className="w-8"></div> 
+          <h2 className="text-[17px] font-bold">New message</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-gray-700"
-            id="close-new-chat"
+            className="text-white hover:text-gray-300 transition"
           >
-            <X size={20} />
+            <X size={26} strokeWidth={2} />
           </button>
         </div>
-        <div className="p-2 border-b border-gray-700">
-          <div className="relative">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              placeholder="Search ..."
-              className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-900 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+
+        <div className="flex items-center px-5 py-1 border-b border-gray-800">
+          <span className="text-base font-medium mr-3">To:</span>
+          <input
+            type="text"
+            placeholder="Search..."
+            className="w-full py-3 bg-transparent border-none text-white placeholder-gray-500 focus:outline-none focus:ring-0 text-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="px-5 py-3">
+            <h3 className="text-sm font-semibold text-white mb-3">Suggested</h3>
+            
+            <div className="space-y-4">
+              {filteredFollowing.length === 0 && (
+                <p className="text-gray-500 text-sm">No users found.</p>
+              )}
+
+              {filteredFollowing.map((user) => {
+                const isSelected = selectedUser?.id === user.id;
+                
+                return (
+                  <div
+                    key={user.id}
+                    onClick={() => setSelectedUser(user)}
+                    className="flex items-center justify-between cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3">
+                      {user.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={user.username}
+                          className="w-12 h-12 rounded-full object-cover bg-gray-700"
+                        />
+                      ) : (
+                        <div
+                          className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold text-white ${getPlaceholderColor(
+                            user.id || user.username
+                          )}`}
+                        >
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-white">
+                          {user.name}
+                        </span>
+                        <span className="text-sm text-gray-400">
+                          {user.username}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`w-6 h-6 rounded-full border transition-all flex items-center justify-center
+                        ${isSelected 
+                          ? "bg-white border-white" 
+                          : "border-gray-500 group-hover:border-gray-300 bg-transparent"
+                        }`}
+                    >
+                      {isSelected && (
+                        <div className="w-2.5 h-2.5 rounded-full bg-black"></div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
-        <div className="grow overflow-y-auto">
-          {followingList.length === 0 && (
-            <p className="p-4 text-center text-gray-400">
-              You are not following anyone.
-            </p>
-          )}
-          {filteredFollowing.length === 0 && searchTerm && (
-            <p className="p-4 text-center text-gray-400">No users found.</p>
-          )}
-          <div className="p-2 space-y-1">
-            {filteredFollowing.map((user) => (
-              <FollowUserItem
-                key={user.id}
-                user={user}
-                onSelect={() => handleSelectUser(user as SimpleUser)}
-              />
-            ))}
-          </div>
+
+        <div className="p-4 border-t border-gray-800 bg-[#262626]">
+          <button
+            onClick={handleStartChat}
+            disabled={!selectedUser}
+            className={`w-full py-3 rounded-lg font-semibold text-sm transition-all
+              ${selectedUser 
+                ? "bg-indigo-600 hover:bg-indigo-500 text-white" 
+                : "bg-indigo-900/40 text-indigo-200/40 cursor-not-allowed"
+              }`}
+          >
+            Chat
+          </button>
         </div>
       </div>
     </div>
   );
 };
-
 export default function NetworkSidebar() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isFocused, setIsFocused] = useState(false);
