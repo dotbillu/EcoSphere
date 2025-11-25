@@ -15,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="bg-black">
-      <body className="bg-black h-100dvh w-full overscroll-none">
+      <body className="bg-black h-100 w-full overscroll-none">
         <Provider>
           <SessionProvider>
             <AuthGuard>{children}</AuthGuard>

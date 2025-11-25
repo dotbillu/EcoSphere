@@ -238,150 +238,159 @@ const NewChatModal: React.FC = () => {
   const setSelectedConversation = useSetAtom(selectedConversationAtom);
   
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedUser, setSelectedUser] = useState<SimpleUser | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
+  // Filter users based on search
   const filteredFollowing = followingList.filter(
     (user) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase())
+      user.username.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  const getPlaceholderColor = (str: string) => {
-    const colors = [
-      "bg-red-600",
-      "bg-blue-600",
-      "bg-green-600",
-      "bg-yellow-600",
-      "bg-purple-600",
-      "bg-pink-600",
-      "bg-indigo-600",
-      "bg-orange-600",
-      "bg-teal-600",
-    ];
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
-  };
-
   const handleStartChat = () => {
-    if (!selectedUser) return;
+    if (!selectedUserId) return;
+
+    const userToChat = followingList.find((u) => u.id === selectedUserId);
+    if (!userToChat) return;
+
+    // Convert Following type to SimpleUser for the DM atom
+    const simpleUser: SimpleUser = {
+      id: userToChat.id,
+      username: userToChat.username,
+      name: userToChat.name,
+      image: userToChat.image,
+      lastMessage: userToChat.lastMessage,
+      lastMessageTimestamp: userToChat.lastMessageTimestamp,
+    };
 
     setIsModalOpen(false);
     setDmConversations((prev) => {
-      const existingDm = prev.find((dm) => dm.id === selectedUser.id);
-      if (!existingDm) return [selectedUser, ...prev];
+      const existingDm = prev.find((dm) => dm.id === simpleUser.id);
+      if (!existingDm) return [simpleUser, ...prev];
       return prev;
     });
-    setSelectedConversation({ type: "dm", data: selectedUser });
+    setSelectedConversation({ type: "dm", data: simpleUser });
+  };
+
+  const toggleSelection = (id: string) => {
+    if (selectedUserId === id) {
+      setSelectedUserId(null);
+    } else {
+      setSelectedUserId(id);
+    }
   };
 
   const onClose = () => setIsModalOpen(false);
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center"
+      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-[#262626] rounded-xl shadow-2xl w-full max-w-md m-4 flex flex-col h-[70vh] md:h-[600px] text-white overflow-hidden"
+        className="bg-[#262626] rounded-xl shadow-2xl w-full max-w-md m-4 flex flex-col h-[75vh] text-gray-100 overflow-hidden border border-gray-800"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center p-4 border-b border-gray-800 relative">
-          <div className="w-8"></div> 
-          <h2 className="text-[17px] font-bold">New message</h2>
+        {/* Header */}
+        <div className="flex justify-between items-center p-4 border-b border-gray-700/50">
+          <div className="w-8"></div> {/* Spacer for centering */}
+          <h2 className="text-lg font-bold text-white tracking-wide">New message</h2>
           <button
             onClick={onClose}
-            className="text-white hover:text-gray-300 transition"
+            className="text-white hover:text-gray-300 transition-colors"
           >
-            <X size={26} strokeWidth={2} />
+            <X size={24} />
           </button>
         </div>
 
-        <div className="flex items-center px-5 py-1 border-b border-gray-800">
-          <span className="text-base font-medium mr-3">To:</span>
+        {/* Search Input Area */}
+        <div className="flex items-center px-5 py-3 border-b border-gray-700/50">
+          <span className="text-lg font-semibold text-white mr-3">To:</span>
           <input
             type="text"
             placeholder="Search..."
-            className="w-full py-3 bg-transparent border-none text-white placeholder-gray-500 focus:outline-none focus:ring-0 text-sm"
+            className="w-full bg-transparent border-none text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-0 text-base"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            autoFocus
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="px-5 py-3">
-            <h3 className="text-sm font-semibold text-white mb-3">Suggested</h3>
-            
-            <div className="space-y-4">
-              {filteredFollowing.length === 0 && (
-                <p className="text-gray-500 text-sm">No users found.</p>
-              )}
+        {/* User List */}
+        <div className="grow overflow-y-auto py-2 custom-scrollbar">
+          <div className="px-5 py-2 text-sm font-semibold text-gray-400">
+            Suggested
+          </div>
+          
+          {filteredFollowing.length === 0 && (
+            <p className="p-5 text-center text-gray-500">No users found.</p>
+          )}
 
-              {filteredFollowing.map((user) => {
-                const isSelected = selectedUser?.id === user.id;
-                
-                return (
-                  <div
-                    key={user.id}
-                    onClick={() => setSelectedUser(user)}
-                    className="flex items-center justify-between cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      {user.avatar ? (
+          <div className="space-y-1">
+            {filteredFollowing.map((user) => {
+              const isSelected = selectedUserId === user.id;
+              
+              return (
+                <div
+                  key={user.id}
+                  onClick={() => toggleSelection(user.id)}
+                  className="flex items-center justify-between px-5 py-3 cursor-pointer hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    {/* Avatar Logic */}
+                    <div className="relative">
+                      {user.image ? (
                         <img
-                          src={user.avatar}
-                          alt={user.username}
-                          className="w-12 h-12 rounded-full object-cover bg-gray-700"
+                          src={user.image}
+                          alt={user.name}
+                          className="w-12 h-12 rounded-full object-cover border border-gray-800"
                         />
                       ) : (
-                        <div
-                          className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold text-white ${getPlaceholderColor(
-                            user.id || user.username
-                          )}`}
-                        >
-                          {user.name.charAt(0).toUpperCase()}
+                        <div className="w-12 h-12 rounded-full bg-black flex items-center justify-center border border-gray-800">
+                          <User size={24} className="text-gray-400" />
                         </div>
                       )}
-                      
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-white">
-                          {user.name}
-                        </span>
-                        <span className="text-sm text-gray-400">
-                          {user.username}
-                        </span>
-                      </div>
                     </div>
-
-                    <div
-                      className={`w-6 h-6 rounded-full border transition-all flex items-center justify-center
-                        ${isSelected 
-                          ? "bg-white border-white" 
-                          : "border-gray-500 group-hover:border-gray-300 bg-transparent"
-                        }`}
-                    >
-                      {isSelected && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-black"></div>
-                      )}
+                    
+                    {/* Name/Username */}
+                    <div className="flex flex-col">
+                      <span className="text-white font-medium text-sm">
+                        {user.name}
+                      </span>
+                      <span className="text-gray-400 text-sm">
+                        {user.username}
+                      </span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+
+                  {/* Selection Circle (Radio style) */}
+                  <div 
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                      isSelected 
+                        ? "bg-blue-600 border-blue-600" 
+                        : "border-gray-500 bg-transparent"
+                    }`}
+                  >
+                    {isSelected && (
+                      <div className="w-2.5 h-2.5 bg-white rounded-full shadow-sm" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-800 bg-[#262626]">
+        {/* Footer with Chat Button */}
+        <div className="p-4 border-t border-gray-700/50">
           <button
+            disabled={!selectedUserId}
             onClick={handleStartChat}
-            disabled={!selectedUser}
-            className={`w-full py-3 rounded-lg font-semibold text-sm transition-all
-              ${selectedUser 
-                ? "bg-indigo-600 hover:bg-indigo-500 text-white" 
-                : "bg-indigo-900/40 text-indigo-200/40 cursor-not-allowed"
-              }`}
+            className={`w-full py-3 rounded-lg font-semibold text-sm transition-all duration-200 ${
+              selectedUserId
+                ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20"
+                : "bg-blue-600/50 text-blue-200/50 cursor-not-allowed"
+            }`}
           >
             Chat
           </button>
