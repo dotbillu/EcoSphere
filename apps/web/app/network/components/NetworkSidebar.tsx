@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAtom, useSetAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, Pencil, X } from "lucide-react";
+import { Search, Pencil, X, User } from "lucide-react";
 import { motion, Variants } from "framer-motion";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
