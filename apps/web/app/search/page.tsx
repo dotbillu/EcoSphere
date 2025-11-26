@@ -21,13 +21,13 @@ type TabType = "all" | "people" | "gigs" | "rooms";
 const fetchPageSearch = async (
   query: string,
   tab: TabType,
-  skip: number = 0
+  skip: number = 0,
 ): Promise<SearchPageResult> => {
   if (query.trim().length < 2) return { results: [], nextSkip: null };
   const res = await fetch(
     `${API_BASE_URL}/search/page?q=${encodeURIComponent(
-      query
-    )}&tab=${tab}&skip=${skip}&take=10`
+      query,
+    )}&tab=${tab}&skip=${skip}&take=10`,
   );
   if (!res.ok) throw new Error("Search failed");
   return res.json();
@@ -42,20 +42,15 @@ export default function SearchPage() {
   const [activeTab, setActiveTab] = useState<TabType>("all");
   const debouncedQuery = useDebounce(query, 300);
 
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isLoading,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: ["search-page", debouncedQuery, activeTab],
-    queryFn: ({ pageParam = 0 }) =>
-      fetchPageSearch(debouncedQuery, activeTab, pageParam),
-    getNextPageParam: (lastPage) => lastPage.nextSkip,
-    initialPageParam: 0,
-    enabled: debouncedQuery.length > 1,
-  });
+  const { data, fetchNextPage, hasNextPage, isLoading, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: ["search-page", debouncedQuery, activeTab],
+      queryFn: ({ pageParam = 0 }) =>
+        fetchPageSearch(debouncedQuery, activeTab, pageParam),
+      getNextPageParam: (lastPage) => lastPage.nextSkip,
+      initialPageParam: 0,
+      enabled: debouncedQuery.length > 1,
+    });
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +72,7 @@ export default function SearchPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search..."
-            className="w-full pl-12 pr-4 py-3 bg-zinc-900 text-white rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full pl-12 pr-4 py-3 bg-zinc-900 text-white rounded-full focus:outline-none  "
           />
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
         </div>
@@ -92,7 +87,7 @@ export default function SearchPage() {
             className={`flex-1 py-3 text-center font-semibold transition-colors
               ${
                 activeTab === tab
-                  ? "text-white border-b-2 border-indigo-500"
+                  ? "text-white border-b-2 border-white"
                   : "text-zinc-500 hover:bg-zinc-900"
               }`}
           >
@@ -105,13 +100,15 @@ export default function SearchPage() {
       <div className="flex-grow">
         {isLoading && (
           <div className="flex justify-center items-center p-10">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-white" />
           </div>
         )}
 
         {!isLoading && allResults.length === 0 && debouncedQuery && (
           <div className="p-10 text-center text-zinc-400">
-            <h3 className="font-bold text-lg text-white">No results for "{query}"</h3>
+            <h3 className="font-bold text-lg text-white">
+              No results for "{query}"
+            </h3>
             <p>Try searching for something else.</p>
           </div>
         )}
@@ -120,11 +117,26 @@ export default function SearchPage() {
           {allResults.map((item, index) => {
             switch (item.type) {
               case "user":
-                return <UserResultCard key={item.data.id} user={item.data as SearchUser} />;
+                return (
+                  <UserResultCard
+                    key={item.data.id}
+                    user={item.data as SearchUser}
+                  />
+                );
               case "gig":
-                return <GigResultCard key={item.data.id} gig={item.data as SearchGig} />;
+                return (
+                  <GigResultCard
+                    key={item.data.id}
+                    gig={item.data as SearchGig}
+                  />
+                );
               case "room":
-                return <RoomResultCard key={item.data.id} room={item.data as SearchRoom} />;
+                return (
+                  <RoomResultCard
+                    key={item.data.id}
+                    room={item.data as SearchRoom}
+                  />
+                );
               // Add PostResultCard if you want posts on the "all" tab
               default:
                 return null;
@@ -137,7 +149,7 @@ export default function SearchPage() {
             <button
               onClick={() => fetchNextPage()}
               disabled={isFetchingNextPage}
-              className="px-4 py-2 bg-indigo-600 rounded-full hover:bg-indigo-700 disabled:opacity-50"
+              className="px-4 py-2 bg-white rounded-full hover:bg-white disabled:opacity-50"
             >
               {isFetchingNextPage ? "Loading more..." : "Load More"}
             </button>

@@ -10,13 +10,13 @@ import {
 } from "@/lib/types";
 import { Socket } from "socket.io-client";
 export type PageName =
-  | "House"
+  | "Home"
   | "Map"
   | "Search"
   | "Network"
   | "Activity"
   | "profile";
-export const CurrentPageAtom = atom<PageName>("House");
+export const CurrentPageAtom = atom<PageName>("Home");
 
 interface LocationState {
   lat: number | null;

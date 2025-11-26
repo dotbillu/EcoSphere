@@ -37,7 +37,7 @@ export default function Navbar() {
   const prevUnseenCountRef = useRef(unseenCount);
 
   const icons = [
-    { name: "House", Icon: House },
+    { name: "Home", Icon: House },
     { name: "Map", Icon: Map },
     { name: "Search", Icon: Search },
     { name: "Network", Icon: Network },
@@ -74,12 +74,12 @@ export default function Navbar() {
   }, [loggedInUser, queryClient, router]);
 
   useEffect(() => {
-    const currentPath = (pathname.split("/")[1] || "house").toLowerCase();
+    const currentPath = (pathname.split("/")[1] || "home").toLowerCase();
 
     switch (currentPath) {
       case "":
-      case "house":
-        setCurrentPage("House");
+      case "home":
+        setCurrentPage("Home");
         break;
       case "map":
         setCurrentPage("Map");
@@ -94,7 +94,7 @@ export default function Navbar() {
         setCurrentPage("profile");
         break;
       default:
-        setCurrentPage("House");
+        setCurrentPage("Home");
     }
   }, [pathname, setCurrentPage]);
 
@@ -110,8 +110,8 @@ export default function Navbar() {
       return;
     }
 
-    if (pagename === "House") {
-      router.push("/house");
+    if (pagename === "Home") {
+      router.push("/home");
       return;
     }
 

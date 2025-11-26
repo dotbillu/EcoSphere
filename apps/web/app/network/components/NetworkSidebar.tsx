@@ -177,7 +177,7 @@ const ConversationItem = React.memo(
             )}
 
             {!isTyping && isUnseen && (
-              <div className="shrink-0 flex items-center justify-center bg-indigo-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1.5 shadow-lg shadow-indigo-500/30">
+              <div className="shrink-0 flex items-center justify-center bg-zinc-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1.5 shadow-lg shadow-zinc-300">
                 {unseenCount > 99 ? "99+" : unseenCount}
               </div>
             )}
@@ -277,6 +277,7 @@ const ConversationList: React.FC<ExtendedConversationListProps> = ({
 };
 
 const NewChatModal: React.FC = () => {
+  const router = useRouter();
   const [followingList] = useAtom(followingListAtom);
   const [, setIsModalOpen] = useAtom(isNewChatModalOpenAtom);
   const [, setDmConversations] = useAtom(dmConversationsAtom);
@@ -306,6 +307,7 @@ const NewChatModal: React.FC = () => {
       return existing ? prev : [simpleUser, ...prev];
     });
     setSelectedConversation({ type: "dm", data: simpleUser });
+    router.push(`/network/${simpleUser.id}`);
   };
 
   return (
@@ -343,7 +345,7 @@ const NewChatModal: React.FC = () => {
               onClick={() =>
                 setSelectedUserId(selectedUserId === user.id ? null : user.id)
               }
-              className={`flex items-center p-3 rounded-xl cursor-pointer ${selectedUserId === user.id ? "bg-indigo-900/30 border border-indigo-500/50" : "hover:bg-zinc-900 border border-transparent"}`}
+              className={`flex items-center p-3 rounded-xl cursor-pointer ${selectedUserId === user.id ? "bg-zinc-800 border " : "hover:bg-zinc-900 border border-transparent"}`}
             >
               {user.image ? (
                 <img
@@ -536,7 +538,7 @@ export default function NetworkSidebar() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="p-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/20 transition-all shrink-0"
+          className="p-2.5 rounded-full text-white shadow-lg shadow-indigo-900/20 transition-all shrink-0 cursor-pointer"
         >
           <Pencil size={18} />
         </button>

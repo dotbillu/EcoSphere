@@ -27,7 +27,7 @@
         "./app/hooks/*"
       ],
       "@housecomponents/*": [
-        "./app/house/components/*"
+        "./app/home/components/*"
       ],
       "@profilecomponents/*": [
         "./app/profile/components/*"

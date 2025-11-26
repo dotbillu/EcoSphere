@@ -790,15 +790,7 @@ const PostEntry = React.forwardRef<
 );
 PostEntry.displayName = "PostEntry";
 
-// -----------------------------------------------------------------------------
-// Component: Feedbox
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-// Main Export: House
-// -----------------------------------------------------------------------------
-
-export default function House() {
+export default function Home() {
   return (
     <>
       <div className="z-999 relative ">

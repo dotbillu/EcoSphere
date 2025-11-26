@@ -39,7 +39,7 @@ export default function LoginPage() {
         setUser(userData);
         console.log("Sync successful");
 
-        router.push("/house");
+        router.push("/home");
       } catch (err) {
         console.error("Failed to sync user:", err);
       }
