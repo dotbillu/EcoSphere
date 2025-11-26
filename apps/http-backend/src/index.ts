@@ -21,4 +21,7 @@ app.use("/search", searchRoutes);
 app.use("/global", globalRoutes);
 app.use("/chat", chatRoutes);
 
+app.post("/activate", (req, res) => {
+  res.send("hello");
+});
 app.listen(PORT);
