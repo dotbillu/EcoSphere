@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAtom } from "jotai";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, Check, SmilePlus, Trash2 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import ChatInput from "./ChatInput";
 import {
   MessageType,
@@ -18,12 +18,11 @@ import {
   MessageListProps,
   ChatPanelProps,
   User,
-} from "@/lib/types"; // Changed from "@types" to "@/lib/types" based on your store.ts
+} from "@/lib/types";
 import { API_BASE_URL } from "@/lib/constants";
 import { db } from "@/lib/db";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import ChatPanelSkeleton from "../ui/ChatPanelSkeleton";
-import SidebarSkeleton from "../ui/SidebarSkeleton";
 import EmojiPicker from "../ui/EmojiPicker";
 import DateHeader from "../ui/DateHeader";
 import {
@@ -31,12 +30,10 @@ import {
   networkErrorAtom,
   userAtom,
   messagesAtom,
+  socketAtom,
 } from "@/store";
-import { socketAtom } from "../layout";
 
 const SCROLL_THRESHOLD = 200;
-
-// --- Helper Functions ---
 
 function formatLastSeen(lastSeen: string | null | undefined): string {
   if (!lastSeen) return "";
@@ -82,13 +79,18 @@ const toSimpleUser = (user: User): SimpleUser => ({
   lastMessageTimestamp: null,
 });
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({
+interface ExtendedMessageBubbleProps extends MessageBubbleProps {
+  shouldAnimate: boolean;
+}
+
+const MessageBubble: React.FC<ExtendedMessageBubbleProps> = ({
   message,
   isMe,
   isGroup,
   onDelete,
   onToggleReaction,
   spacing,
+  shouldAnimate,
 }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const senderName = message.sender?.name || "Unknown";
@@ -97,7 +99,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     minute: "2-digit",
   });
   const placeholder = `https://placehold.co/40x40/374151/white?text=${senderName.charAt(0).toUpperCase()}`;
-
   const rawImage = message.sender?.image;
   const src = rawImage
     ? rawImage.startsWith("http")
@@ -116,8 +117,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     : {};
 
   const hasReactions = Object.entries(groupedReactions).length > 0;
-  const bubbleEnterDelay = 0.45;
-  const reactionEnterDelay = bubbleEnterDelay + 0.1;
 
   return (
     <div
@@ -141,20 +140,20 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Link>
         )}
         {isMe && <div className="w-8 h-8 shrink-0" />}
+
         <motion.div
           layout
-          {...(isMe &&
-            message.isOptimistic && {
-              initial: { scale: 0.8, opacity: 0 },
-              animate: { scale: 1, opacity: 1 },
-              transition: {
-                type: "spring",
-                stiffness: 300,
-                damping: 20,
-                delay: bubbleEnterDelay,
-              },
-            })}
-          className={`px-3 py-2 rounded-2xl shadow-sm relative ${isMe ? "bg-indigo-600 text-white rounded-br-lg" : "bg-[#262626] text-gray-200 rounded-bl-lg"}`}
+          {...(shouldAnimate
+            ? {
+                initial: { opacity: 0, y: 5, scale: 0.95 },
+                animate: { opacity: 1, y: 0, scale: 1 },
+                transition: { type: "spring", stiffness: 500, damping: 30 },
+              }
+            : {
+                initial: false,
+                animate: false,
+              })}
+          className={`px-3 py-2 rounded-2xl shadow-sm relative ${isMe ? "bg-indigo-600 text-white rounded-br-none origin-bottom-right" : "bg-[#262626] text-gray-200 rounded-bl-none origin-bottom-left"}`}
         >
           {isGroup && !isMe && (
             <Link
@@ -176,30 +175,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             <span>{timestamp}</span>
             {isMe && <Check size={16} />}
           </div>
-          <AnimatePresence>
-            {hasReactions && (
-              <motion.div
-                key="reactions"
-                initial={{ opacity: 0, y: 5, scale: 0.8 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 5 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 300,
-                  damping: 25,
-                  delay: reactionEnterDelay,
-                }}
-                className="absolute -bottom-4 right-0 flex gap-1 bg-gray-800 border border-gray-700 rounded-full px-2 py-0.5 shadow-md origin-bottom-right"
-              >
-                {Object.entries(groupedReactions).map(([emoji, count]) => (
-                  <span key={emoji} className="text-xs">
-                    {emoji} {count > 1 && count}
-                  </span>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+
+          {hasReactions && (
+            <div className="absolute -bottom-4 right-0 flex gap-1 bg-gray-800 border border-gray-700 rounded-full px-2 py-0.5 shadow-md z-10">
+              {Object.entries(groupedReactions).map(([emoji, count]) => (
+                <span key={emoji} className="text-xs">
+                  {emoji} {count > 1 && count}
+                </span>
+              ))}
+            </div>
+          )}
         </motion.div>
+
         <div className="relative flex flex-col items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity self-center">
           <button
             onClick={() => setShowEmojiPicker((p) => !p)}
@@ -233,6 +220,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 };
 
+interface ExtendedMessageListProps extends MessageListProps {
+  allowAnimations: boolean;
+}
+
 const MessageList = React.memo(
   ({
     messages,
@@ -240,7 +231,8 @@ const MessageList = React.memo(
     selectedConversation,
     onDelete,
     onToggleReaction,
-  }: MessageListProps) => {
+    allowAnimations,
+  }: ExtendedMessageListProps) => {
     let lastDateString: string | null = null;
     let lastMessageTimestamp: Date | null = null;
     let lastSenderId: string | null = null;
@@ -250,7 +242,6 @@ const MessageList = React.memo(
       <div className="flex flex-col justify-end min-h-full pb-2">
         {messages.map((msg) => {
           if (!msg || !msg.createdAt) return null;
-
           const messageDate = new Date(msg.createdAt);
           const messageDateString = formatDate(messageDate);
           let showDateHeader = false;
@@ -280,6 +271,7 @@ const MessageList = React.memo(
                 onDelete={onDelete}
                 onToggleReaction={onToggleReaction}
                 spacing={spacing}
+                shouldAnimate={allowAnimations}
               />
             </React.Fragment>
           );
@@ -298,9 +290,9 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
   const [socket] = useAtom(socketAtom);
 
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
-  const [isSwitching, setIsSwitching] = useState(false);
-  const [isExiting] = useState(false);
+  const [isCacheLoading, setIsCacheLoading] = useState(true);
   const [headerImgError, setHeaderImgError] = useState(false);
+  const [allowAnimations, setAllowAnimations] = useState(false);
 
   const router = useRouter();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -319,64 +311,58 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
   useEffect(() => {
     if (!selectedConversation || !currentUser) return;
 
+    setIsCacheLoading(true);
+    setAllowAnimations(false);
+    setMessages([]);
+    setHeaderImgError(false);
+
     const loadFromCache = async () => {
-      setIsSwitching(true);
-      setHeaderImgError(false);
-      setMessages([]);
-
       let cachedMsgs = [];
-      if (selectedConversation.type === "room") {
-        cachedMsgs = await db.messages
-          .where("roomId")
-          .equals(selectedConversation.data.id)
-          .toArray();
-      } else {
-        const myId = String(currentUser.id);
-        const otherId = String(selectedConversation.data.id);
-        cachedMsgs = await db.messages
-          .filter((msg) => {
-            if (msg.roomId) return false;
-            const sId = String(msg.senderId);
-            const rId = String(msg.recipientId);
-            return (
-              (sId === myId && rId === otherId) ||
-              (sId === otherId && rId === myId)
-            );
-          })
-          .toArray();
-      }
+      try {
+        if (selectedConversation.type === "room") {
+          cachedMsgs = await db.messages
+            .where("roomId")
+            .equals(selectedConversation.data.id)
+            .toArray();
+        } else {
+          const myId = String(currentUser.id);
+          const otherId = String(selectedConversation.data.id);
+          cachedMsgs = await db.messages
+            .filter((msg) => {
+              if (msg.roomId) return false;
+              const sId = String(msg.senderId);
+              const rId = String(msg.recipientId);
+              return (
+                (sId === myId && rId === otherId) ||
+                (sId === otherId && rId === myId)
+              );
+            })
+            .toArray();
+        }
 
-      cachedMsgs.sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-      );
-
-      if (cachedMsgs.length > 0) {
-        setMessages(cachedMsgs);
-        setTimeout(() => {
+        if (cachedMsgs.length > 0) {
+          cachedMsgs.sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+          );
+          setMessages(cachedMsgs);
           if (scrollContainerRef.current) {
             scrollContainerRef.current.scrollTop =
               scrollContainerRef.current.scrollHeight;
           }
-        }, 0);
-      }
-
-      setTimeout(() => {
-        setIsSwitching(false);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsCacheLoading(false);
         isInitialLoad.current = true;
-      }, 50);
+        setTimeout(() => setAllowAnimations(true), 100);
+      }
     };
 
     loadFromCache();
-  }, [
-    selectedConversation?.data.id,
-    currentUser?.id,
-    setMessages,
-    currentUser,
-    selectedConversation,
-  ]);
+  }, [selectedConversation?.data.id, currentUser, setMessages]);
 
-  // 2. FETCH FROM NETWORK
   const {
     data: fetchedMessages,
     isLoading: isLoadingMessages,
@@ -390,30 +376,24 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
     if (fetchedMessages && fetchedMessages.length > 0) {
       const sorted = [...fetchedMessages].reverse();
       setMessages(sorted);
-      db.messages
-        .bulkPut(sorted)
-        .catch((err) => console.error("DB Bulk Sync Error", err));
+      db.messages.bulkPut(sorted).catch((err) => console.error(err));
     }
   }, [fetchedMessages, setMessages]);
 
-  // Reset typing users on conversation change
   useEffect(() => {
     setTypingUsers([]);
   }, [selectedConversation?.data.id]);
 
   useEffect(() => {
-    if (isError) setError("Failed to fetch messages");
-    else setError(null);
+    setError(isError ? "Failed to fetch messages" : null);
   }, [isError, setError]);
 
-  // Scroll Logic
   useLayoutEffect(() => {
-    if (isSwitching || !scrollContainerRef.current) return;
+    if (isCacheLoading || !scrollContainerRef.current) return;
 
     if (oldScrollHeightRef.current > 0 && !isLoadingMore) {
-      const newScrollHeight = scrollContainerRef.current.scrollHeight;
       scrollContainerRef.current.scrollTop =
-        newScrollHeight - oldScrollHeightRef.current;
+        scrollContainerRef.current.scrollHeight - oldScrollHeightRef.current;
       oldScrollHeightRef.current = 0;
       return;
     }
@@ -426,15 +406,13 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
       } else {
         const { scrollTop, scrollHeight, clientHeight } =
           scrollContainerRef.current;
-        const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (isNearBottom) {
-          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (scrollHeight - scrollTop - clientHeight < 200) {
+          messagesEndRef.current?.scrollIntoView();
         }
       }
     }
-  }, [messages, isLoadingMore, isSwitching, typingUsers]);
+  }, [messages, isLoadingMore, isCacheLoading]);
 
-  // 3. SOCKET LOGIC
   useEffect(() => {
     if (!socket) return;
 
@@ -470,13 +448,11 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
     const handleIncomingMessage = (msg: MessageType) => {
       const currentConvo = selectedConversationRef.current;
       const currentUser = currentUserRef.current;
-
       if (!currentConvo || !currentUser) return;
 
       setTypingUsers((prev) => prev.filter((u) => u.name !== msg.sender?.name));
 
       let isForCurrentConvo = false;
-
       if (currentConvo.type === "room") {
         if (String(msg.roomId) === String(currentConvo.data.id))
           isForCurrentConvo = true;
@@ -485,7 +461,6 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
         const msgRecipient = String(msg.recipientId);
         const currentId = String(currentUser.id);
         const convoId = String(currentConvo.data.id);
-
         if (
           (msgSender === convoId && msgRecipient === currentId) ||
           (msgSender === currentId && msgRecipient === convoId)
@@ -496,16 +471,13 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
 
       if (isForCurrentConvo) {
         setMessages((prev) => [...prev, msg]);
-        db.messages
-          .put(msg)
-          .catch((e) => console.error("Socket DB Write Error", e));
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-        }, 50);
+        db.messages.put(msg).catch(console.error);
+        setTimeout(
+          () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
+          50,
+        );
       } else {
-        db.messages
-          .put(msg)
-          .catch((e) => console.error("Background DB Write Error", e));
+        db.messages.put(msg).catch(console.error);
       }
     };
 
@@ -524,24 +496,18 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
 
   const renderTypingIndicator = () => {
     if (typingUsers.length === 0) return null;
-    const isDM = selectedConversation?.type === "dm";
-
-    if (isDM) {
+    if (selectedConversation?.type === "dm") {
       return (
         <div className="ml-4 mb-2 mt-2">
           <span className="loading loading-dots loading-sm text-zinc-400"></span>
         </div>
       );
     }
-
     const names = typingUsers.map((u) => u.name);
-    let text = "";
-    if (names.length <= 3) {
-      text = names.join(", ");
-    } else {
-      text = `${names.slice(0, 3).join(", ")}...`;
-    }
-
+    const text =
+      names.length <= 3
+        ? names.join(", ")
+        : `${names.slice(0, 3).join(", ")}...`;
     return (
       <div className="ml-4 mb-2 mt-2 flex items-center gap-2 animate-pulse">
         <span className="loading loading-dots loading-xs text-zinc-400"></span>
@@ -552,25 +518,19 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
     );
   };
 
-  const fetchMoreMessages = () => {
-    if (isLoadingMore || !hasNextPage || !scrollContainerRef.current) return;
-    oldScrollHeightRef.current = scrollContainerRef.current.scrollHeight;
-    fetchNextPage();
-  };
-
   const handleScroll = () => {
     if (
       scrollContainerRef.current &&
       scrollContainerRef.current.scrollTop < SCROLL_THRESHOLD
     ) {
-      fetchMoreMessages();
+      if (isLoadingMore || !hasNextPage) return;
+      oldScrollHeightRef.current = scrollContainerRef.current.scrollHeight;
+      fetchNextPage();
     }
   };
 
   const handleBack = () => {
-    setTimeout(() => {
-      router.push("/network");
-    }, 0);
+    router.push("/network");
   };
 
   const handleSendMessage = async (content: string) => {
@@ -581,11 +541,8 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
       !socket
     )
       return;
-
     const tempId = crypto.randomUUID();
-    // FIXED: Use helper to ensure SimpleUser type
     const tempSender = toSimpleUser(currentUser);
-
     const tempMessageBase = {
       id: tempId,
       content,
@@ -627,17 +584,16 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
     }
 
     setMessages((prev) => [...prev, tempMessage]);
-    db.messages
-      .put(tempMessage)
-      .catch((e) => console.error("Send DB Write Error", e));
+    db.messages.put(tempMessage).catch(console.error);
     socket.emit(eventName, payload);
-
-    setTimeout(() => {
-      scrollContainerRef.current?.scrollTo({
-        top: scrollContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }, 50);
+    setTimeout(
+      () =>
+        scrollContainerRef.current?.scrollTo({
+          top: scrollContainerRef.current.scrollHeight,
+          behavior: "smooth",
+        }),
+      50,
+    );
   };
 
   const handleDeleteMessage = async (messageId: number | string) => {
@@ -646,7 +602,6 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
     const oldMessages = messages;
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
     await db.messages.delete(messageId);
-
     try {
       socket.emit("message:delete", {
         userId: currentUser.id,
@@ -654,7 +609,7 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
         messageType,
       });
     } catch (err) {
-      setError("Failed to delete message." + err);
+      setError(`failed : ${err}`);
       setMessages(oldMessages);
     }
   };
@@ -665,7 +620,6 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
   ) => {
     if (!currentUser || !selectedConversation || !socket) return;
     const messageType = selectedConversation.type === "room" ? "group" : "dm";
-
     const calculateReactions = (msg: MessageType) => {
       const existingReaction = msg.reactions?.find(
         (r) => r.emoji === emoji && r.user.id === currentUser.id,
@@ -675,28 +629,22 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
         ? reactions.filter((r) => r.id !== existingReaction.id)
         : [
             ...reactions,
-            {
-              id: crypto.randomUUID(),
-              emoji,
-              user: toSimpleUser(currentUser),
-            },
+            { id: crypto.randomUUID(), emoji, user: toSimpleUser(currentUser) },
           ];
     };
 
     setMessages((prev) =>
-      prev.map((msg) => {
-        if (msg.id === messageId) {
-          return { ...msg, reactions: calculateReactions(msg) };
-        }
-        return msg;
-      }),
+      prev.map((msg) =>
+        msg.id === messageId
+          ? { ...msg, reactions: calculateReactions(msg) }
+          : msg,
+      ),
     );
-
     const msg = await db.messages.get(messageId);
-    if (msg) {
-      const newReactions = calculateReactions(msg);
-      await db.messages.update(messageId, { reactions: newReactions });
-    }
+    if (msg)
+      await db.messages.update(messageId, {
+        reactions: calculateReactions(msg),
+      });
 
     socket.emit("reaction:toggle", {
       userId: currentUser.id,
@@ -706,14 +654,8 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
     });
   };
 
-  if (isExiting)
-    return (
-      <div className="fixed inset-0 bg-black z-999 p-4">
-        <SidebarSkeleton />
-      </div>
-    );
   if (!selectedConversation) return null;
-  if (isSwitching) return <div className="flex-1 w-full h-full bg-black" />;
+  if (isCacheLoading) return <ChatPanelSkeleton />;
 
   const name = selectedConversation.data.name;
   const rawImageUrl =
@@ -735,7 +677,6 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
 
   return (
     <div className="flex flex-col h-full w-full bg-black relative overflow-hidden ml-2">
-      {/* Header */}
       <div className="flex-none flex items-center p-3 bg-black border-b border-zinc-800 z-10">
         <button
           onClick={handleBack}
@@ -783,7 +724,6 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
         </div>
       </div>
 
-      {/* Messages Area */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
@@ -795,7 +735,9 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
           </div>
         )}
         {!messages && isLoadingMessages ? (
-          <ChatPanelSkeleton />
+          <div className="flex justify-center items-center h-full text-zinc-600">
+            Loading...
+          </div>
         ) : (
           <>
             {messages.length === 0 && (
@@ -810,6 +752,7 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
                 selectedConversation={selectedConversation}
                 onDelete={handleDeleteMessage}
                 onToggleReaction={handleToggleReaction}
+                allowAnimations={allowAnimations}
               />
             )}
             {renderTypingIndicator()}
@@ -819,7 +762,6 @@ const ChatPanel: React.FC<ChatPanelProps> = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
       <div className="flex-none w-full bg-black z-10">
         <ChatInput
           onSend={handleSendMessage}

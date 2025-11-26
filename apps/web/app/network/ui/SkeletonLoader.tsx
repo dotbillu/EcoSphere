@@ -11,8 +11,8 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ className }) => {
     <div
       className={`
         animate-shimmer 
-        bg-[linear-gradient(90deg,theme(colors.zinc.800)_25%,theme(colors.zinc.700)_50%,theme(colors.zinc.800)_75%)] 
-        bg-[size:200%_100%]
+        bg-[linear-gradient(90deg,var(--color-zinc-800)_25%,var(--color-zinc-700)_50%,var(--color-zinc-800)_75%)] 
+        bg-size-[200%_100%]
         ${className}
       `}
     />

@@ -252,16 +252,17 @@ export interface MessageListProps {
   onDelete: (messageId: string) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
 }
+export type Conversation = (ChatMapRoom | SimpleUser) & { type: "room" | "dm" };
 
 export interface ConversationItemProps {
-  item: ((ChatMapRoom | SimpleUser) & { type: "room" | "dm" }) | null;
+  item: Conversation | ChatMapRoom | SimpleUser;
   type: "room" | "dm";
   isSelected: boolean;
   onClick: () => void;
 }
 
 export interface ConversationListProps {
-  items: ((ChatMapRoom | SimpleUser) & { type: "room" | "dm" })[];
+  items: Conversation[];
   searchTerm: string;
 }
 

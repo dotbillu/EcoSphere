@@ -10,18 +10,14 @@ const senderSelect = {
   name: true,
   image: true,
 };
-const reactionSelect = {
-  id: true,
-  emoji: true,
-  user: { select: senderSelect },
-};
 
-// GET DM history (FOR PAGINATION / LOADING OLD MESSAGES)
+// GET DM history
 router.get("/:otherUserId", async (req, res) => {
   const { otherUserId } = req.params;
   const { currentUserId, skip, take } = req.query;
-  
-  if (!currentUserId) return res.status(400).json({ message: "Missing currentUserId" });
+
+  if (!currentUserId)
+    return res.status(400).json({ message: "Missing currentUserId" });
 
   try {
     const messages = await prisma.directMessage.findMany({
@@ -35,15 +31,13 @@ router.get("/:otherUserId", async (req, res) => {
       skip: parseInt(skip as string) || 0,
       take: parseInt(take as string) || 30,
       include: {
-        sender: {
-          select: { id: true, username: true, name: true, image: true }
-        },
+        sender: { select: senderSelect },
         reactions: {
           select: {
             id: true,
             emoji: true,
-            user: { select: { id: true, username: true, name: true } }
-          }
+            user: { select: { id: true, username: true, name: true } },
+          },
         },
       },
     });
@@ -54,10 +48,6 @@ router.get("/:otherUserId", async (req, res) => {
   }
 });
 
-// --- POST DM (REMOVED) ---
-// This logic is now handled by the ws-backend
-
-// --- GET DM "Inbox" (List of users you've chatted with) ---
 router.get("/conversations/:userId", async (req, res) => {
   const { userId } = req.params;
   try {
@@ -80,15 +70,25 @@ router.get("/conversations/:userId", async (req, res) => {
     const conversations = new Map<string, any>();
 
     for (const message of messages) {
-      const otherUser =
-        message.senderId === uId ? message.recipient : message.sender;
+      const isMeSender = message.senderId === uId;
+      const otherUser = isMeSender ? message.recipient : message.sender;
 
-      if (otherUser && !conversations.has(otherUser.id)) {
-        conversations.set(otherUser.id, {
-          ...otherUser,
-          lastMessage: message.content,
-          lastMessageTimestamp: message.createdAt,
-        });
+      if (otherUser) {
+        if (!conversations.has(otherUser.id)) {
+          conversations.set(otherUser.id, {
+            ...otherUser,
+            lastMessage: message.content,
+            lastMessageTimestamp: message.createdAt,
+            unseenCount: 0,
+          });
+        }
+
+        if (!isMeSender && !message.isRead) {
+          const conv = conversations.get(otherUser.id);
+          if (conv) {
+            conv.unseenCount += 1;
+          }
+        }
       }
     }
 
@@ -99,7 +99,28 @@ router.get("/conversations/:userId", async (req, res) => {
   }
 });
 
+router.post("/mark-read", async (req, res) => {
+  const { currentUserId, otherUserId } = req.body;
 
+  if (!currentUserId || !otherUserId) {
+    return res.status(400).json({ message: "Missing IDs" });
+  }
+
+  try {
+    await prisma.directMessage.updateMany({
+      where: {
+        senderId: otherUserId,
+        recipientId: currentUserId,
+        isRead: false,
+      },
+      data: { isRead: true },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error marking messages as read:", error);
+    res.status(500).json({ message: "Failed to mark as read" });
+  }
+});
 
 router.delete("/message/:messageId", async (req, res) => {
   res

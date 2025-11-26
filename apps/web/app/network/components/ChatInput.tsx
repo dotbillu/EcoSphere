@@ -5,8 +5,7 @@ import { SendHorizontal, Smile } from "lucide-react";
 import EmojiPicker, { EmojiClickData, Theme } from "emoji-picker-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAtom } from "jotai";
-import { socketAtom } from "../layout";
-import { selectedConversationAtom, userAtom } from "@/store";
+import { selectedConversationAtom, socketAtom, userAtom } from "@/store";
 import { ChatInputProps } from "@/lib/types";
 
 const INITIAL_WIDTH = 1000;
@@ -25,7 +24,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [content, setContent] = useState("");
   const [isEmojiPickerOpen, setEmojiPickerOpen] = useState(false);
   
-  // Kept purely for the animation prop, currently static at 1000
   const [dynamicWidth] = useState(INITIAL_WIDTH);
 
   const [socket] = useAtom(socketAtom);

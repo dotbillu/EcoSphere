@@ -1,19 +1,21 @@
 "use client";
-import { QueryFunctionContext } from "@tanstack/react-query";
+
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useAtom, useSetAtom } from "jotai";
-import { useQueryClient } from "@tanstack/react-query";
-import { Search, Pencil, X, User } from "lucide-react";
-import { motion, Variants } from "framer-motion";
+import { useAtom } from "jotai";
+import { useQueryClient, QueryFunctionContext } from "@tanstack/react-query";
+import { Search, Pencil, X, User as UserIcon } from "lucide-react";
+import { motion } from "framer-motion";
 import { useLiveQuery } from "dexie-react-hooks";
+
 import {
   ConversationItemProps,
   ConversationListProps,
   ChatMapRoom,
   SimpleUser,
-} from "@types";
+  Conversation,
+} from "@/lib/types";
 import { API_BASE_URL } from "@/lib/constants";
 import { db } from "@/lib/db";
 import {
@@ -24,11 +26,11 @@ import {
   networkErrorAtom,
   isNewChatModalOpenAtom,
   selectedConversationAtom,
-  followingListAtom,
   sidebarTransitionLoadingAtom,
+  followingListAtom,
+  socketAtom,
 } from "@/store";
 import SidebarSkeleton from "../ui/SidebarSkeleton";
-import FollowUserItem from "../ui/FollowUserItem";
 
 function formatTimestamp(timestamp: string | null): string {
   if (!timestamp) return "";
@@ -44,6 +46,7 @@ function formatTimestamp(timestamp: string | null): string {
   if (days < 7) return `${days}d`;
   return `${Math.floor(days / 7)}w`;
 }
+
 type ConversationParams = {
   type: "room" | "dm";
   id: string;
@@ -51,12 +54,12 @@ type ConversationParams = {
 };
 type MessagesQueryKey = readonly [string, ConversationParams];
 const MESSAGES_PER_PAGE = 30;
+
 const fetchInitialMessages = async ({
   queryKey,
 }: QueryFunctionContext<MessagesQueryKey>) => {
   const [, conversation] = queryKey;
   const { type, id, currentUserId } = conversation;
-
   const url =
     type === "room"
       ? `${API_BASE_URL}/chat/room/${id}/messages?skip=0&take=${MESSAGES_PER_PAGE}`
@@ -66,46 +69,35 @@ const fetchInitialMessages = async ({
   if (!res.ok) throw new Error("Failed to fetch messages");
   return res.json();
 };
-const listVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.03,
-      when: "beforeChildren",
-    },
-  },
-};
 
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 5 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.3,
-      ease: "anticipate",
-    },
-  },
-};
+interface ExtendedConversationItemProps extends ConversationItemProps {
+  typingName?: string | null;
+}
+
 const ConversationItem = React.memo(
-  ({ item, type, isSelected, onClick }: ConversationItemProps) => {
+  ({
+    item,
+    type,
+    isSelected,
+    onClick,
+    typingName,
+  }: ExtendedConversationItemProps) => {
     const [imgError, setImgError] = useState(false);
+
+    const name = item?.name || "";
+    const rawImageUrl = item
+      ? type === "room"
+        ? (item as ChatMapRoom).imageUrl
+        : (item as SimpleUser).image
+      : null;
 
     useEffect(() => {
       setImgError(false);
-    }, [item]);
+    }, [rawImageUrl]);
 
     if (!item) return null;
 
-    const name = item.name;
-    const rawImageUrl =
-      type === "room"
-        ? (item as ChatMapRoom).imageUrl
-        : (item as SimpleUser).image;
-
     const placeholder = `https://placehold.co/40x40/zinc/white?text=${name.charAt(0).toUpperCase()}`;
-
     const src =
       !imgError && rawImageUrl
         ? rawImageUrl.startsWith("http")
@@ -116,55 +108,76 @@ const ConversationItem = React.memo(
     const lastMessage = item.lastMessage || "";
     const time = formatTimestamp(item.lastMessageTimestamp);
     const unseenCount = item.unseenCount || 0;
+    const isUnseen = unseenCount > 0;
     const isOnline = type === "dm" ? (item as SimpleUser).isOnline : false;
+
+    const isTyping = !!typingName;
+    const typingText =
+      type === "room" && typingName ? `${typingName} is cooking` : "";
 
     return (
       <motion.button
-        variants={itemVariants}
+        layout
+        transition={{ duration: 0.2 }}
         onClick={onClick}
         className={`
-        flex items-center w-full p-3 rounded-lg text-left transition-colors mb-1 border-l-4
-        ${
-          isSelected
-            ? "md:bg-zinc-800 md:border-zinc-300 border-transparent"
-            : "hover:bg-zinc-900 border-transparent"
-        }
-      `}
+          flex items-center w-full p-3 rounded-lg text-left transition-all mb-1 border-l-4 group relative
+          ${
+            isSelected
+              ? "lg:bg-zinc-800 lg:border-zinc-300 lg:shadow-md border-transparent"
+              : "border-transparent lg:hover:bg-zinc-900/60"
+          }
+        `}
       >
         <div className="relative shrink-0 mr-3">
-          <div className="relative w-12 h-12 rounded-full overflow-hidden bg-zinc-800">
+          <div
+            className={`relative w-12 h-12 rounded-full overflow-hidden border ${isSelected ? "lg:border-zinc-500 border-zinc-800" : "border-zinc-800"} bg-zinc-800`}
+          >
             <Image
               src={src}
               alt={name}
-              width={48}
-              height={48}
+              fill
               className="object-cover"
               onError={() => setImgError(true)}
               unoptimized={true}
             />
           </div>
           {isOnline && (
-            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-zinc-900 rounded-full"></span>
+            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-black rounded-full shadow-sm"></span>
           )}
         </div>
 
-        <div className="grow min-w-0">
-          <div className="flex justify-between items-baseline">
-            <h3 className="font-sans font-medium text-base text-zinc-100 truncate pr-2">
+        <div className="grow min-w-0 flex flex-col justify-center">
+          <div className="flex justify-between items-baseline mb-0.5">
+            <h3
+              className={`text-sm truncate pr-2 ${isUnseen ? "font-bold text-white" : "font-medium text-zinc-200 group-hover:text-zinc-100"}`}
+            >
               {name}
             </h3>
-            <span className="text-xs text-zinc-500 shrink-0">{time}</span>
+            <span
+              className={`text-[10px] shrink-0 ${isUnseen || isTyping ? "text-white font-bold" : "text-zinc-500"}`}
+            >
+              {time}
+            </span>
           </div>
           <div className="flex justify-between items-center">
-            <p
-              className={`text-sm truncate max-w-[85%] ${unseenCount > 0 ? "text-zinc-200 font-medium" : "text-zinc-500"}`}
-            >
-              {lastMessage || (
-                <span className="italic text-zinc-600">No messages</span>
-              )}
-            </p>
-            {unseenCount > 0 && (
-              <div className="shrink-0 flex items-center justify-center bg-zinc-100 text-zinc-900 text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1">
+            {isTyping ? (
+              <p className="text-xs truncate max-w-[80%] text-white font-semibold italic animate-pulse">
+                <span className="loading loading-dots loading-xs text-white mr-1 align-bottom"></span>
+                {typingText}
+              </p>
+            ) : (
+              <p
+                className={`text-xs truncate max-w-[80%] ${isUnseen ? "text-zinc-100 font-semibold" : "text-zinc-500 group-hover:text-zinc-400"}`}
+              >
+                {lastMessage || (
+                  <span className="italic text-zinc-700">No messages</span>
+                )}
+              </p>
+            )}
+
+            {!isTyping && isUnseen && (
+              <div className="shrink-0 flex items-center justify-center bg-indigo-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1.5 shadow-lg shadow-indigo-500/30">
                 {unseenCount > 99 ? "99+" : unseenCount}
               </div>
             )}
@@ -176,84 +189,109 @@ const ConversationItem = React.memo(
 );
 ConversationItem.displayName = "ConversationItem";
 
-const ConversationList: React.FC<ConversationListProps> = ({
+interface ExtendedConversationListProps extends ConversationListProps {
+  typingStates: Record<string, string | null>;
+}
+
+const ConversationList: React.FC<ExtendedConversationListProps> = ({
   items,
   searchTerm,
+  typingStates,
 }) => {
-  const [selectedConversation] = useAtom(selectedConversationAtom);
-  const setUserRooms = useSetAtom(userRoomsAtom);
-  const setDmConversations = useSetAtom(dmConversationsAtom);
+  const [selectedConversation, setSelectedConversation] = useAtom(
+    selectedConversationAtom,
+  );
   const router = useRouter();
+  const [user] = useAtom(userAtom);
+  const [, setUserRooms] = useAtom(userRoomsAtom);
+  const [, setDmConversations] = useAtom(dmConversationsAtom);
 
   const filteredItems = items.filter((item) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  const handleSelect = (
-    item: (ChatMapRoom | SimpleUser) & { type: "room" | "dm" },
-  ) => {
-    if (item.unseenCount && item.unseenCount > 0) {
-      const setter = item.type === "room" ? setUserRooms : setDmConversations;
-      setter((prev: any) =>
-        prev.map((i: any) => (i.id === item.id ? { ...i, unseenCount: 0 } : i)),
-      );
-    }
+  const handleSelect = async (item: Conversation) => {
     if (selectedConversation?.data.id !== item.id) {
+      if (item.type === "room") {
+        setSelectedConversation({ type: "room", data: item as ChatMapRoom });
+      } else {
+        setSelectedConversation({ type: "dm", data: item as SimpleUser });
+      }
       router.push(`/network/${item.id}`);
     }
-  };
 
+    if ((item.unseenCount || 0) > 0) {
+      if (item.type === "room") {
+        setUserRooms((prev) =>
+          prev.map((i) => (i.id === item.id ? { ...i, unseenCount: 0 } : i)),
+        );
+        try {
+          const room = await db.rooms.get(item.id);
+          if (room) await db.rooms.put({ ...room, unseenCount: 0 });
+        } catch (e) {}
+      } else {
+        setDmConversations((prev) =>
+          prev.map((i) => (i.id === item.id ? { ...i, unseenCount: 0 } : i)),
+        );
+        try {
+          const dm = await db.dms.get(item.id);
+          if (dm) await db.dms.put({ ...dm, unseenCount: 0 });
+          if (user) {
+            fetch(`${API_BASE_URL}/chat/dm/mark-read`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                currentUserId: user.id,
+                otherUserId: item.id,
+              }),
+            }).catch((e) => console.error("Mark read failed", e));
+          }
+        } catch (e) {
+          console.log(`${e}`);
+        }
+      }
+    }
+  };
   if (filteredItems.length === 0 && searchTerm) {
     return (
-      <div className="p-4 text-center text-zinc-500 text-sm">
+      <div className="p-4 text-center text-zinc-600 text-xs">
         No results found.
       </div>
     );
   }
 
   return (
-    <motion.nav
-      className="px-2 pb-2"
-      variants={listVariants}
-      initial="hidden"
-      animate="visible"
-    >
+    <div className="px-2 pb-2">
       {filteredItems.map((item) => (
         <ConversationItem
           key={item.id}
           item={item}
           type={item.type}
           isSelected={item.id === selectedConversation?.data.id}
+          typingName={typingStates[item.id]}
           onClick={() => handleSelect(item)}
         />
       ))}
-    </motion.nav>
+    </div>
   );
 };
 
 const NewChatModal: React.FC = () => {
   const [followingList] = useAtom(followingListAtom);
-  const setIsModalOpen = useSetAtom(isNewChatModalOpenAtom);
-  const setDmConversations = useSetAtom(dmConversationsAtom);
-  const setSelectedConversation = useSetAtom(selectedConversationAtom);
-  
+  const [, setIsModalOpen] = useAtom(isNewChatModalOpenAtom);
+  const [, setDmConversations] = useAtom(dmConversationsAtom);
+  const [, setSelectedConversation] = useAtom(selectedConversationAtom);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  // Filter users based on search
-  const filteredFollowing = followingList.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredFollowing = followingList.filter((u) =>
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const handleStartChat = () => {
     if (!selectedUserId) return;
-
     const userToChat = followingList.find((u) => u.id === selectedUserId);
     if (!userToChat) return;
-
-    // Convert Following type to SimpleUser for the DM atom
     const simpleUser: SimpleUser = {
       id: userToChat.id,
       username: userToChat.username,
@@ -262,135 +300,71 @@ const NewChatModal: React.FC = () => {
       lastMessage: userToChat.lastMessage,
       lastMessageTimestamp: userToChat.lastMessageTimestamp,
     };
-
     setIsModalOpen(false);
     setDmConversations((prev) => {
-      const existingDm = prev.find((dm) => dm.id === simpleUser.id);
-      if (!existingDm) return [simpleUser, ...prev];
-      return prev;
+      const existing = prev.find((d) => d.id === simpleUser.id);
+      return existing ? prev : [simpleUser, ...prev];
     });
     setSelectedConversation({ type: "dm", data: simpleUser });
   };
 
-  const toggleSelection = (id: string) => {
-    if (selectedUserId === id) {
-      setSelectedUserId(null);
-    } else {
-      setSelectedUserId(id);
-    }
-  };
-
-  const onClose = () => setIsModalOpen(false);
-
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center backdrop-blur-sm"
-      onClick={onClose}
+      className="fixed inset-0 bg-black/80 z-50 flex justify-center items-center backdrop-blur-sm"
+      onClick={() => setIsModalOpen(false)}
     >
       <div
-        className="bg-[#262626] rounded-xl shadow-2xl w-full max-w-md m-4 flex flex-col h-[75vh] text-gray-100 overflow-hidden border border-gray-800"
+        className="bg-[#1a1a1a] rounded-2xl shadow-2xl w-full max-w-md m-4 flex flex-col h-[70vh] border border-zinc-800 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-700/50">
-          <div className="w-8"></div> {/* Spacer for centering */}
-          <h2 className="text-lg font-bold text-white tracking-wide">New message</h2>
+        <div className="flex justify-between items-center p-4 border-b border-zinc-800">
+          <div className="w-6" />
+          <h2 className="text-base font-bold text-white">New Message</h2>
           <button
-            onClick={onClose}
-            className="text-white hover:text-gray-300 transition-colors"
+            onClick={() => setIsModalOpen(false)}
+            className="text-zinc-400 hover:text-white"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
         </div>
-
-        {/* Search Input Area */}
-        <div className="flex items-center px-5 py-3 border-b border-gray-700/50">
-          <span className="text-lg font-semibold text-white mr-3">To:</span>
+        <div className="p-3 border-b border-zinc-800">
           <input
             type="text"
             placeholder="Search..."
-            className="w-full bg-transparent border-none text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-0 text-base"
+            className="w-full bg-zinc-900 rounded-lg px-4 py-2 text-sm text-white focus:outline-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            autoFocus
           />
         </div>
-
-        {/* User List */}
-        <div className="grow overflow-y-auto py-2 custom-scrollbar">
-          <div className="px-5 py-2 text-sm font-semibold text-gray-400">
-            Suggested
-          </div>
-          
-          {filteredFollowing.length === 0 && (
-            <p className="p-5 text-center text-gray-500">No users found.</p>
-          )}
-
-          <div className="space-y-1">
-            {filteredFollowing.map((user) => {
-              const isSelected = selectedUserId === user.id;
-              
-              return (
-                <div
-                  key={user.id}
-                  onClick={() => toggleSelection(user.id)}
-                  className="flex items-center justify-between px-5 py-3 cursor-pointer hover:bg-white/5 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    {/* Avatar Logic */}
-                    <div className="relative">
-                      {user.image ? (
-                        <img
-                          src={user.image}
-                          alt={user.name}
-                          className="w-12 h-12 rounded-full object-cover border border-gray-800"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-black flex items-center justify-center border border-gray-800">
-                          <User size={24} className="text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Name/Username */}
-                    <div className="flex flex-col">
-                      <span className="text-white font-medium text-sm">
-                        {user.name}
-                      </span>
-                      <span className="text-gray-400 text-sm">
-                        {user.username}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Selection Circle (Radio style) */}
-                  <div 
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                      isSelected 
-                        ? "bg-blue-600 border-blue-600" 
-                        : "border-gray-500 bg-transparent"
-                    }`}
-                  >
-                    {isSelected && (
-                      <div className="w-2.5 h-2.5 bg-white rounded-full shadow-sm" />
-                    )}
-                  </div>
+        <div className="grow overflow-y-auto p-2 custom-scrollbar space-y-1">
+          {filteredFollowing.map((user) => (
+            <div
+              key={user.id}
+              onClick={() =>
+                setSelectedUserId(selectedUserId === user.id ? null : user.id)
+              }
+              className={`flex items-center p-3 rounded-xl cursor-pointer ${selectedUserId === user.id ? "bg-indigo-900/30 border border-indigo-500/50" : "hover:bg-zinc-900 border border-transparent"}`}
+            >
+              {user.image ? (
+                <img
+                  src={user.image}
+                  className="w-10 h-10 rounded-full mr-3 object-cover"
+                  alt={user.name}
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mr-3 border border-zinc-700">
+                  <UserIcon size={18} className="text-zinc-400" />
                 </div>
-              );
-            })}
-          </div>
+              )}
+              <div className="text-sm font-medium text-white">{user.name}</div>
+            </div>
+          ))}
         </div>
-
-        {/* Footer with Chat Button */}
-        <div className="p-4 border-t border-gray-700/50">
+        <div className="p-4 border-t border-zinc-800">
           <button
             disabled={!selectedUserId}
             onClick={handleStartChat}
-            className={`w-full py-3 rounded-lg font-semibold text-sm transition-all duration-200 ${
-              selectedUserId
-                ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20"
-                : "bg-blue-600/50 text-blue-200/50 cursor-not-allowed"
-            }`}
+            className="w-full bg-white text-black font-bold py-3 rounded-xl disabled:opacity-50"
           >
             Chat
           </button>
@@ -399,6 +373,7 @@ const NewChatModal: React.FC = () => {
     </div>
   );
 };
+
 export default function NetworkSidebar() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -407,68 +382,97 @@ export default function NetworkSidebar() {
   const [user] = useAtom(userAtom);
   const [userRooms] = useAtom(userRoomsAtom);
   const [dmConversations] = useAtom(dmConversationsAtom);
-
   const [loading] = useAtom(networkLoadingAtom);
   const [error] = useAtom(networkErrorAtom);
-
-  const setIsModalOpen = useSetAtom(isNewChatModalOpenAtom);
-  const [isModalOpen] = useAtom(isNewChatModalOpenAtom);
+  const [isModalOpen, setIsModalOpen] = useAtom(isNewChatModalOpenAtom);
   const [isTransitioning] = useAtom(sidebarTransitionLoadingAtom);
+  const [socket] = useAtom(socketAtom);
   const queryClient = useQueryClient();
 
-  const localRooms = useLiveQuery(() => db.rooms.toArray(), []) || [];
-  const localDms = useLiveQuery(() => db.dms.toArray(), []) || [];
-  useEffect(() => {
-    if (userRooms.length > 0) {
-      db.rooms
-        .bulkPut(userRooms)
-        .catch((err) => console.error("Failed to sync rooms to cache", err));
-    }
-  }, [userRooms]);
+  const [typingStates, setTypingStates] = useState<
+    Record<string, string | null>
+  >({});
 
-  useEffect(() => {
-    if (dmConversations.length > 0) {
-      db.dms
-        .bulkPut(dmConversations)
-        .catch((err) => console.error("Failed to sync DMs to cache", err));
-    }
-  }, [dmConversations]);
+  const localRooms = useLiveQuery(() => db.rooms.toArray(), []);
+  const localDms = useLiveQuery(() => db.dms.toArray(), []);
 
-  const displayRooms = userRooms.length > 0 ? userRooms : localRooms;
-  const displayDms = dmConversations.length > 0 ? dmConversations : localDms;
+  const combinedAndSortedConversations = useMemo<Conversation[]>(() => {
+    const safeLocalRooms = localRooms || [];
+    const safeLocalDms = localDms || [];
 
-  const combinedAndSortedConversations = useMemo(() => {
-    const roomsWithType = displayRooms.map((room) => ({
-      ...room,
-      type: "room" as const,
-    }));
-    const dmsWithType = displayDms.map((dm) => ({
-      ...dm,
-      type: "dm" as const,
-    }));
-    return [...roomsWithType, ...dmsWithType].sort((a, b) => {
-      if (!a.lastMessageTimestamp) return 1;
-      if (!b.lastMessageTimestamp) return -1;
-      return (
-        new Date(b.lastMessageTimestamp).getTime() -
-        new Date(a.lastMessageTimestamp).getTime()
-      );
+    const mergeItems = <T extends ChatMapRoom | SimpleUser>(
+      stateItems: T[],
+      localItems: T[],
+      type: "room" | "dm",
+    ): Conversation[] => {
+      const baseItems = stateItems.length > 0 ? stateItems : localItems;
+      return baseItems.map((item) => {
+        const local = localItems.find((l) => l.id === item.id);
+        let finalUnseen = item.unseenCount || 0;
+        if (local && (local.unseenCount || 0) > finalUnseen) {
+          finalUnseen = local.unseenCount || 0;
+        }
+        return { ...item, unseenCount: finalUnseen, type } as Conversation;
+      });
+    };
+
+    const mergedRooms = mergeItems(userRooms, safeLocalRooms, "room");
+    const mergedDms = mergeItems(dmConversations, safeLocalDms, "dm");
+
+    return [...mergedRooms, ...mergedDms].sort((a, b) => {
+      const timeA = new Date(a.lastMessageTimestamp || 0).getTime();
+      const timeB = new Date(b.lastMessageTimestamp || 0).getTime();
+      return timeB - timeA;
     });
-  }, [displayRooms, displayDms]);
+  }, [userRooms, dmConversations, localRooms, localDms]);
 
   useEffect(() => {
-    if (user && (userRooms.length > 0 || dmConversations.length > 0)) {
-      const conversations = [
-        ...userRooms.map((room) => ({ type: "room", data: room })),
-        ...dmConversations.map((dm) => ({ type: "dm", data: dm })),
-      ];
-      conversations.forEach((conv) => {
+    if (!socket) return;
+
+    const handleUserTyping = (data: {
+      conversationId: string;
+      name: string;
+    }) => {
+      setTypingStates((prev) => ({
+        ...prev,
+        [data.conversationId]: data.name,
+      }));
+    };
+
+    const handleUserStoppedTyping = (data: { conversationId: string }) => {
+      setTypingStates((prev) => ({ ...prev, [data.conversationId]: null }));
+    };
+
+    const handleIncomingMessage = (msg: {
+      roomId?: string;
+      senderId: string;
+    }) => {
+      const idToClear = msg.roomId || msg.senderId;
+      setTypingStates((prev) => ({ ...prev, [idToClear]: null }));
+    };
+
+    socket.on("user:typing", handleUserTyping);
+    socket.on("user:stopped-typing", handleUserStoppedTyping);
+    socket.on("dm:message", handleIncomingMessage);
+    socket.on("group:message", handleIncomingMessage);
+
+    return () => {
+      socket.off("user:typing", handleUserTyping);
+      socket.off("user:stopped-typing", handleUserStoppedTyping);
+      socket.off("dm:message", handleIncomingMessage);
+      socket.off("group:message", handleIncomingMessage);
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    if (user && combinedAndSortedConversations.length > 0) {
+      combinedAndSortedConversations.slice(0, 5).forEach((conv) => {
         const queryKey = [
           "chat",
-          { type: conv.type, id: conv.data.id, currentUserId: user.id },
+          { type: conv.type, id: conv.id, currentUserId: user.id },
         ] as MessagesQueryKey;
         queryClient.prefetchInfiniteQuery({
-          queryKey: queryKey,
+          queryKey,
           queryFn: fetchInitialMessages,
           initialPageParam: 0,
           getNextPageParam: () => undefined,
@@ -476,7 +480,7 @@ export default function NetworkSidebar() {
         });
       });
     }
-  }, [userRooms, dmConversations, user, queryClient]);
+  }, [combinedAndSortedConversations, user, queryClient]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -492,7 +496,6 @@ export default function NetworkSidebar() {
   }, []);
 
   const isExpanded = isFocused || searchTerm.length > 0;
-
   const shouldShowSkeleton =
     (loading.profile && combinedAndSortedConversations.length === 0) ||
     isTransitioning;
@@ -500,19 +503,20 @@ export default function NetworkSidebar() {
   return (
     <div className="flex flex-col w-full h-full bg-black border-r border-zinc-800 mt-2 relative">
       {isModalOpen && <NewChatModal />}
+
       <div className="flex items-center gap-2 px-3 py-3 shrink-0">
         <div className="grow" ref={searchBarRef}>
           <div
-            className={`relative flex items-center rounded-full transition-all duration-200 ${isExpanded ? "bg-zinc-800" : "bg-zinc-900"}`}
+            className={`relative flex items-center rounded-full transition-all duration-200 ${isExpanded ? "bg-zinc-800 ring-1 ring-zinc-700" : "bg-zinc-900"}`}
           >
             <Search
               size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"
+              className={`absolute left-3 top-1/2 -translate-y-1/2 ${isExpanded ? "text-white" : "text-zinc-500"}`}
             />
             <input
               type="text"
               placeholder="Search"
-              className="w-full pl-9 pr-8 py-2 rounded-full bg-transparent text-sm text-white placeholder:text-zinc-500 focus:outline-none"
+              className="w-full pl-9 pr-8 py-2.5 rounded-full bg-transparent text-sm text-white placeholder:text-zinc-500 focus:outline-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onFocus={() => setIsFocused(true)}
@@ -523,7 +527,7 @@ export default function NetworkSidebar() {
                   setSearchTerm("");
                   setIsFocused(false);
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-zinc-700"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-zinc-700 transition-colors"
               >
                 <X className="w-3 h-3 text-zinc-400" />
               </button>
@@ -532,14 +536,13 @@ export default function NetworkSidebar() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="p-2 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors shrink-0"
-          id="new-chat-btn"
+          className="p-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/20 transition-all shrink-0"
         >
-          <Pencil size={20} />
+          <Pencil size={18} />
         </button>
       </div>
 
-      <div className="grow overflow-y-auto custom-scrollbar px-2 mt-4">
+      <div className="grow overflow-y-auto custom-scrollbar px-2 mt-2">
         {shouldShowSkeleton ? (
           <SidebarSkeleton />
         ) : (
@@ -547,6 +550,7 @@ export default function NetworkSidebar() {
             <ConversationList
               items={combinedAndSortedConversations}
               searchTerm={searchTerm}
+              typingStates={typingStates}
             />
           )
         )}

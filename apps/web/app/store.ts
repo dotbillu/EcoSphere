@@ -8,8 +8,14 @@ import {
   SimpleUser,
   MessageType,
 } from "@/lib/types";
-
-export type PageName = "House" | "Map" | "Search" | "Network" | "Activity" | "profile";
+import { Socket } from "socket.io-client";
+export type PageName =
+  | "House"
+  | "Map"
+  | "Search"
+  | "Network"
+  | "Activity"
+  | "profile";
 export const CurrentPageAtom = atom<PageName>("House");
 
 interface LocationState {
@@ -56,18 +62,10 @@ export const toggleFollowAtom = atom(null, (get, set, username: string) => {
   }
 });
 
-export const likePostAtom = atom(null, (get, set, postId: number) => {
+export const likePostAtom = atom(null, (get) => {
   const user = get(userAtom);
   if (!user) return;
 });
-
-export const selectedConversationAtom = atom<SelectedConversation>(null);
-export const userRoomsAtom = atom<ChatMapRoom[]>([]);
-export const dmConversationsAtom = atom<SimpleUser[]>([]);
-export const messagesAtom = atom<MessageType[]>([]);
-
-const profileLoadingAtom = atom<boolean>(true);
-const messagesLoadingAtom = atom<boolean>(false);
 
 export const networkLoadingAtom = atom(
   (get) => ({
@@ -90,3 +88,24 @@ export type NetworkFilter = "all" | "rooms" | "dms";
 export const networkFilterAtom = atom<NetworkFilter>("all");
 
 export const sidebarTransitionLoadingAtom = atom(false);
+
+export const selectedConversationAtom = atom<SelectedConversation>(null);
+export const userRoomsAtom = atom<ChatMapRoom[]>([]);
+export const dmConversationsAtom = atom<SimpleUser[]>([]);
+export const messagesAtom = atom<MessageType[]>([]);
+
+export const totalUnseenConversationsAtom = atom((get) => {
+  const rooms = get(userRoomsAtom);
+  const dms = get(dmConversationsAtom);
+  const unseenRooms = rooms.filter((r) => (r.unseenCount || 0) > 0).length;
+  const unseenDms = dms.filter((d) => (d.unseenCount || 0) > 0).length;
+
+  return unseenRooms + unseenDms;
+});
+
+const profileLoadingAtom = atom<boolean>(true);
+const messagesLoadingAtom = atom<boolean>(false);
+
+
+export const socketAtom = atom<Socket | null>(null);
+
