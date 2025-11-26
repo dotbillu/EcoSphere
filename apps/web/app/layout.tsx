@@ -39,7 +39,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (status === "loading") {
     return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center z-50 h-[100dvh] w-full">
+      <div className="fixed inset-0 bg-black flex items-center justify-center z-50 h-100 w-full">
         <span className="loading loading-dots loading-xl text-white"></span>
       </div>
     );
