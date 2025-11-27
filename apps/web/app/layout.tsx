@@ -31,6 +31,10 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const path = usePathname();
 
+  if (path.startsWith("/api/auth")) {
+    return <>{children}</>;
+  }
+
   useEffect(() => {
     if (status === "unauthenticated" && path !== "/login") {
       router.replace("/login");
@@ -56,11 +60,9 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   if (session) {
     return (
       <div className="bg-black relative h-dvh w-full overflow-hidden">
-        <div className="h-full w-full overflow-y-auto pb-24">
-          {children}
-        </div>
+        <div className="h-full w-full overflow-y-auto pb-24">{children}</div>
         <div className="fixed bottom-0 left-0 right-0 w-full z-50">
-           <Navbar />
+          <Navbar />
         </div>
       </div>
     );
