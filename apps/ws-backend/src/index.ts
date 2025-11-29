@@ -7,6 +7,8 @@ const prisma = new PrismaClient();
 
 const httpServer = createServer((req, res) => {
   if (req.url === "/health") {
+    res.end();
+    return;
   }
 });
 
