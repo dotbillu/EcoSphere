@@ -7,9 +7,6 @@ const prisma = new PrismaClient();
 
 const httpServer = createServer((req, res) => {
   if (req.url === "/health") {
-    res.writeHead(200);
-    res.end("OK");
-  } else {
   }
 });
 
@@ -20,8 +17,12 @@ const io = new Server(httpServer, {
   },
 });
 
-const LISTENING_PORT = parseInt(process.env.PORT || process.env.WS_PORT || "8213");
-const SELF_URL = process.env.NEXT_PUBLIC_WS_SERVER_LINK || `http://localhost:${LISTENING_PORT}`;
+const LISTENING_PORT = parseInt(
+  process.env.PORT || process.env.WS_PORT || "8213",
+);
+const SELF_URL =
+  process.env.NEXT_PUBLIC_WS_SERVER_LINK ||
+  `http://localhost:${LISTENING_PORT}`;
 
 const senderSelect = {
   id: true,
@@ -323,18 +324,24 @@ httpServer.listen(LISTENING_PORT, "0.0.0.0", () => {
   console.log(`live on port :${LISTENING_PORT}`);
   if (process.env.NODE_ENV === "production" && SELF_URL) {
     console.log(`Setting up keep-alive ping for ${SELF_URL}`);
-    setInterval(async () => {
-      try {
-        console.log(`Sending keep-alive ping to ${SELF_URL}/health`);
-        const response = await fetch(`${SELF_URL}/health`);
-        if (response.ok) {
-          console.log("Keep-alive ping successful:", response.status);
-        } else {
-          console.warn("Keep-alive ping returned bad status:", response.status);
+    setInterval(
+      async () => {
+        try {
+          console.log(`Sending keep-alive ping to ${SELF_URL}/health`);
+          const response = await fetch(`${SELF_URL}/health`);
+          if (response.ok) {
+            console.log("Keep-alive ping successful:", response.status);
+          } else {
+            console.warn(
+              "Keep-alive ping returned bad status:",
+              response.status,
+            );
+          }
+        } catch (error) {
+          console.error("Keep-alive ping failed:", error);
         }
-      } catch (error) {
-        console.error("Keep-alive ping failed:", error);
-      }
-    }, 14 * 60 * 1000);
+      },
+      14 * 60 * 1000,
+    );
   }
 });
