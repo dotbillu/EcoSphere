@@ -22,6 +22,6 @@ app.use("/global", globalRoutes);
 app.use("/chat", chatRoutes);
 
 app.get("/activate", (req, res) => {
-  res.end("");
+  res.status(200).send("ok");
 });
 app.listen(PORT);
